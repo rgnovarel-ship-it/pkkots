@@ -129,7 +129,15 @@ def init():
                 strategy TEXT,
                 outcome TEXT,
                 profit REAL,
+                prediction_error REAL,
                 capital_after REAL
+            );
+
+            CREATE TABLE IF NOT EXISTS action_snapshot(
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                ts TEXT,
+                counts_json TEXT,
+                total INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS verdicts(
@@ -157,6 +165,12 @@ def init():
             CREATE INDEX IF NOT EXISTS idx_verdicts_ts ON verdicts(ts);
             """
         )
+
+        existing_ledger_cols = {
+            row[1] for row in c.execute("PRAGMA table_info(capital_ledger)").fetchall()
+        }
+        if "prediction_error" not in existing_ledger_cols:
+            c.execute("ALTER TABLE capital_ledger ADD COLUMN prediction_error REAL")
 
         for k, v in DEFAULT_SETTINGS.items():
             c.execute("INSERT OR IGNORE INTO settings(k,v) VALUES(?,?)", (k, v))
@@ -208,6 +222,7 @@ def _normalize_experiment(raw: dict) -> dict | None:
     """Uniformise un enregistrement d'expérience, qu'il vienne du CSV
     d'export (valeurs texte) ou du JSON de /api/state (valeurs typées)."""
     try:
+        prediction_error = raw.get("prediction_error")
         return {
             "id": int(raw["id"]),
             "ts": raw.get("ts") or now_iso(),
@@ -215,6 +230,7 @@ def _normalize_experiment(raw: dict) -> dict | None:
             "strategy": raw.get("strategy") or "inconnue",
             "outcome": raw.get("outcome") or "NEUTRAL",
             "profit": float(raw.get("actual_profit") or 0.0),
+            "prediction_error": float(prediction_error) if prediction_error not in (None, "") else None,
         }
     except (TypeError, ValueError, KeyError):
         return None
@@ -249,6 +265,28 @@ def fetch_experiments(base_url: str, timeout: float = 8.0) -> tuple[list[dict], 
         raise ConnectionError(f"NOVAREL injoignable sur {url} : {e}") from e
 
 
+def fetch_action_distribution(base_url: str, timeout: float = 8.0) -> dict | None:
+    """Récupère les opportunités récentes de NOVAREL et compte la
+    répartition des actions du Decision Engine (STOP, TEST, OPTIMIZE...).
+    Absent silencieusement sur une version de NOVAREL antérieure au
+    Decision Engine (pas de champ recommended_action) : renvoie None.
+    """
+    try:
+        r = requests.get(f"{base_url.rstrip('/')}/api/state", timeout=timeout)
+        r.raise_for_status()
+        opportunities = r.json().get("opportunities", [])
+    except requests.RequestException:
+        return None
+
+    counts: dict[str, int] = {}
+    for o in opportunities:
+        action = o.get("recommended_action")
+        if action:
+            counts[action] = counts.get(action, 0) + 1
+
+    return counts or None
+
+
 def sync_from_novarel() -> dict:
     base_url = setting("novarel_base_url")
 
@@ -261,6 +299,8 @@ def sync_from_novarel() -> dict:
                 (now_iso(), "ERROR", str(e)),
             )
         return {"ok": False, "error": str(e)}
+
+    action_counts = fetch_action_distribution(base_url)
 
     with get_db(write=True) as c:
         existing_ids = {
@@ -281,14 +321,24 @@ def sync_from_novarel() -> dict:
             peak = max(peak, capital)
             c.execute(
                 "INSERT INTO capital_ledger(ts,source_experiment_id,category,strategy,outcome,"
-                "profit,capital_after) VALUES(?,?,?,?,?,?,?)",
-                (e["ts"], e["id"], e["category"], e["strategy"], e["outcome"], e["profit"], capital),
+                "profit,prediction_error,capital_after) VALUES(?,?,?,?,?,?,?,?)",
+                (e["ts"], e["id"], e["category"], e["strategy"], e["outcome"], e["profit"],
+                 e["prediction_error"], capital),
             )
 
         if new_rows:
             c.execute(
                 "UPDATE capital_state SET capital=?, peak_capital=?, updated_at=? WHERE id=1",
                 (capital, peak, now_iso()),
+            )
+
+        if action_counts is not None:
+            import json as _json
+            total = sum(action_counts.values())
+            c.execute(
+                "INSERT INTO action_snapshot(id,ts,counts_json,total) VALUES(1,?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET ts=excluded.ts, counts_json=excluded.counts_json, total=excluded.total",
+                (now_iso(), _json.dumps(action_counts), total),
             )
 
         c.execute(
@@ -335,6 +385,27 @@ def compute_metrics() -> dict:
     win_rate = (wins / n) if n else 0.0
     total_return_pct = ((capital - starting) / starting) if starting else 0.0
 
+    # Calibration : NOVAREL prédit-il bien ses propres résultats ? On compare
+    # l'erreur de prédiction moyenne récente à celle d'avant, pour détecter
+    # une dérive plutôt qu'un simple instantané.
+    errors = [row["prediction_error"] for row in ledger if row["prediction_error"] is not None]
+    recent_errors = errors[-20:]
+    older_errors = errors[:-20] if len(errors) > 20 else []
+    calibration_error_recent = (sum(recent_errors) / len(recent_errors)) if recent_errors else None
+    calibration_error_older = (sum(older_errors) / len(older_errors)) if older_errors else None
+    calibration_drift = (
+        calibration_error_recent - calibration_error_older
+        if calibration_error_recent is not None and calibration_error_older is not None
+        else None
+    )
+
+    with get_db() as c:
+        snap = c.execute("SELECT * FROM action_snapshot WHERE id=1").fetchone()
+    action_distribution = None
+    if snap:
+        import json as _json
+        action_distribution = {"ts": snap["ts"], "total": snap["total"], "counts": _json.loads(snap["counts_json"])}
+
     return {
         "starting_capital": starting,
         "capital": capital,
@@ -346,6 +417,10 @@ def compute_metrics() -> dict:
         "win_rate": win_rate,
         "by_category": [dict(r) for r in by_category],
         "curve": [{"id": r["source_experiment_id"], "capital": r["capital_after"]} for r in ledger[-200:]],
+        "calibration_error_recent": calibration_error_recent,
+        "calibration_error_older": calibration_error_older,
+        "calibration_drift": calibration_drift,
+        "action_distribution": action_distribution,
     }
 
 
@@ -436,6 +511,44 @@ def generate_verdicts() -> list[dict]:
                     f"Recommandation : dépondérer cette catégorie dans les prochains cycles."
                 ),
                 "metric_value": cat["profit_sum"],
+                "suggested_risk_fraction": None,
+            })
+
+    # Calibration : NOVAREL se met-il à moins bien prédire ses propres
+    # résultats ? Une dérive positive significative mérite un avertissement,
+    # même si le capital reste stable pour l'instant.
+    drift = metrics["calibration_drift"]
+    if drift is not None and drift > 0.10 and metrics["calibration_error_recent"] > 0.30:
+        proposals.append({
+            "severity": "warning",
+            "title": "Dérive de calibration",
+            "detail": (
+                f"L'erreur de prédiction moyenne est passée de "
+                f"{metrics['calibration_error_older']:.0%} à {metrics['calibration_error_recent']:.0%} "
+                f"sur les dernières expériences synchronisées. NOVAREL prédit moins bien qu'avant : "
+                f"vérifier le Learning Lab avant d'augmenter le risque."
+            ),
+            "metric_value": drift,
+            "suggested_risk_fraction": None,
+        })
+
+    # Répartition des actions du Decision Engine : si le Buyer Brain
+    # recommande majoritairement d'arrêter ou de ne pas exécuter, c'est un
+    # signal de portefeuille à surfacer même avant que ça n'affecte le capital.
+    dist = metrics["action_distribution"]
+    if dist and dist["total"] >= 5:
+        stop_like = dist["counts"].get("STOP", 0) + dist["counts"].get("DO_NOT_EXECUTE", 0)
+        stop_ratio = stop_like / dist["total"]
+        if stop_ratio >= 0.5:
+            proposals.append({
+                "severity": "warning",
+                "title": "Majorité d'opportunités arrêtées",
+                "detail": (
+                    f"{stop_ratio:.0%} des {dist['total']} dernières opportunités évaluées par NOVAREL "
+                    f"sont recommandées en STOP ou DO_NOT_EXECUTE. Le marché simulé actuel semble peu "
+                    f"favorable ; envisager d'attendre plutôt que de forcer de nouvelles expériences."
+                ),
+                "metric_value": stop_ratio,
                 "suggested_risk_fraction": None,
             })
 
@@ -679,6 +792,11 @@ label{display:block;font-size:12px;color:#8fa3b7;margin-bottom:4px}
 </div>
 
 <div class="grid2">
+<div class="panel"><h2>Calibration de NOVAREL</h2><div id="calibration"></div></div>
+<div class="panel"><h2>Répartition des actions (Decision Engine)</h2><div id="actions" class="list"></div></div>
+</div>
+
+<div class="grid2">
 <div class="panel"><h2>Verdicts (Finance Brain)</h2><div id="verdicts" class="list"></div></div>
 <div class="panel">
 <h2>Réglages</h2>
@@ -765,6 +883,25 @@ async function load(){
   $("categories").innerHTML = m.by_category.length ? m.by_category.map(c=>
     `<div class="row"><span>${esc(c.category)}<br><span class="small">${c.n} trades · ${c.wins} gains</span></span><b class="${c.profit_sum>=0?'pos':'neg'}">${eur(c.profit_sum)}</b></div>`
   ).join("") : "<div class=\"muted\">Aucune donnée pour l'instant.</div>";
+
+  if(m.calibration_error_recent==null){
+    $("calibration").innerHTML = "<div class=\"muted\">Pas encore assez de données de calibration.</div>";
+  } else {
+    const drift = m.calibration_drift;
+    const driftTxt = drift==null ? "" : (drift>0 ? `<span class="neg">+${pct(drift)}</span> vs avant` : `<span class="pos">${pct(drift)}</span> vs avant`);
+    $("calibration").innerHTML = `<div class="row"><span>Erreur de prédiction récente</span><b>${pct(m.calibration_error_recent)}</b></div>
+    <div class="row"><span>Évolution</span><b>${driftTxt||'—'}</b></div>`;
+  }
+
+  const dist = m.action_distribution;
+  if(!dist){
+    $("actions").innerHTML = "<div class=\"muted\">Pas encore de données (nécessite une version de NOVAREL avec Decision Engine).</div>";
+  } else {
+    const entries = Object.entries(dist.counts).sort((a,b)=>b[1]-a[1]);
+    $("actions").innerHTML = entries.map(([action,n])=>
+      `<div class="row"><span>${esc(action)}</span><b>${n} (${pct(n/dist.total)})</b></div>`
+    ).join("") + `<div class="small" style="margin-top:6px">Instantané NOVAREL du ${esc(dist.ts)}</div>`;
+  }
 
   $("verdicts").innerHTML = d.verdicts.length ? d.verdicts.map(v=>
     `<div class="verdict ${esc(v.severity)}"><b>${esc(v.title)}</b><div class="small">${esc(v.detail)}</div>

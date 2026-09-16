@@ -51,6 +51,7 @@ MODULES = [
     ("Learning Lab", "Crée des hypothèses, expériences et apprend des résultats", "ACTIVE"),
     ("Finance Brain", "Suit CA, marge, cash et risque", "ACTIVE"),
     ("Research Brain", "Alimente la recherche et journalise les sources", "ACTIVE"),
+    ("Affiliate Brain", "Teste niches et formats de contenu d'affiliation en simulation", "ACTIVE"),
 ]
 
 STRATEGIES = [
@@ -65,6 +66,67 @@ STRATEGIES = [
 ]
 
 CATEGORIES = ["mode", "sneakers", "electronique", "collection", "maison", "livres", "outillage", "sport"]
+
+# ------------------------------------------------------------
+# Provenance des données : NOVAREL ne doit jamais présenter une
+# donnée simulée comme un fait observé. Toute valeur importante
+# (prix, score, profit...) porte désormais un statut explicite.
+# ------------------------------------------------------------
+DATA_STATUS = {
+    "ESTIMATED": "estimation",
+    "OBSERVED": "observed",
+    "VERIFIED": "verified",
+    "SIMULATED": "simulation",
+    "UNKNOWN": "unknown",
+}
+
+# Actions que le Decision Engine peut recommander pour une opportunité.
+# STOP et DO_NOT_EXECUTE ne sont jamais des suppressions silencieuses :
+# elles restent visibles avec leur raison dans l'historique.
+ACTIONS = [
+    "RESEARCH_MORE",
+    "VERIFY",
+    "TEST",
+    "OPTIMIZE",
+    "SCALE",
+    "WAIT",
+    "STOP",
+    "DO_NOT_EXECUTE",
+]
+
+# ============================================================
+# AFFILIATE BRAIN — module additif
+# ------------------------------------------------------------
+# Simule des décisions de marketing d'affiliation (niche + format de
+# contenu) avec la même mécanique d'apprentissage que le reste de
+# NOVAREL (bandit de Thompson, expériences, connaissances). Comme pour
+# le reste de NOVAREL, tout est SIMULATED : aucun vrai lien, aucun
+# vrai trafic, aucune vraie commission ne sont générés ici.
+# ============================================================
+
+AFFILIATE_NICHES = [
+    "tech_gadgets", "fitness", "beaute", "maison_connectee",
+    "cuisine", "mode", "jeux_video", "finance_perso",
+]
+
+AFFILIATE_STRATEGIES = [
+    ("seo_blog", "Blog SEO longue traîne",
+     "Articles de comparatif optimisés pour la recherche organique, trafic lent mais durable"),
+    ("youtube_review", "Vidéos de test YouTube",
+     "Avis produits filmés, forte confiance mais production plus lente"),
+    ("tiktok_short", "Contenu court viral",
+     "Vidéos courtes à fort potentiel de portée mais conversion plus imprévisible"),
+    ("comparison_site", "Site comparatif",
+     "Page dédiée à comparer plusieurs produits d'une même catégorie"),
+    ("email_list", "Liste email",
+     "Recommandations envoyées à une audience déjà engagée, meilleur taux de conversion"),
+    ("paid_ads", "Publicité payante",
+     "Trafic acheté, rapide à démarrer mais coût d'acquisition à surveiller"),
+    ("instagram_influence", "Contenu Instagram",
+     "Posts et stories avec lien en bio, dépend de l'engagement de l'audience"),
+    ("coupon_deals", "Site de bons plans",
+     "Codes promo et deals, fort volume mais commission souvent plus faible"),
+]
 
 LEARNING_MODES = {
     # Coefficient d'exploration utilisé par choose_strategy(). Plus il est élevé,
@@ -81,6 +143,8 @@ EXPORTABLE_TABLES = {
     "knowledge": "SELECT * FROM knowledge ORDER BY id DESC",
     "strategies": "SELECT * FROM strategies ORDER BY id DESC",
     "events": "SELECT * FROM events ORDER BY id DESC",
+    "affiliate_experiments": "SELECT * FROM affiliate_experiments ORDER BY id DESC",
+    "affiliate_strategies": "SELECT * FROM affiliate_strategies ORDER BY id DESC",
 }
 
 
@@ -166,6 +230,34 @@ def init():
                 PRIMARY KEY(strategy_code, category)
             );
 
+            CREATE TABLE IF NOT EXISTS affiliate_strategies(
+                id INTEGER PRIMARY KEY,
+                code TEXT UNIQUE, name TEXT, description TEXT,
+                tests INTEGER DEFAULT 0, wins INTEGER DEFAULT 0,
+                losses INTEGER DEFAULT 0, neutrals INTEGER DEFAULT 0,
+                revenue_sum REAL DEFAULT 0, cost_sum REAL DEFAULT 0,
+                confidence REAL DEFAULT 0.50, weight REAL DEFAULT 1.0,
+                last_result TEXT, updated_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS affiliate_niche_stats(
+                strategy_code TEXT, niche TEXT,
+                tests INTEGER DEFAULT 0, wins INTEGER DEFAULT 0,
+                losses INTEGER DEFAULT 0,
+                confidence REAL DEFAULT 0.50,
+                PRIMARY KEY(strategy_code, niche)
+            );
+
+            CREATE TABLE IF NOT EXISTS affiliate_experiments(
+                id INTEGER PRIMARY KEY,
+                ts TEXT, ts_epoch REAL,
+                strategy TEXT, niche TEXT, hypothesis TEXT,
+                traffic INTEGER, clicks INTEGER, conversions INTEGER,
+                conversion_rate REAL, commission_per_sale REAL,
+                revenue REAL, cost REAL, profit REAL,
+                outcome TEXT, lesson TEXT, confidence REAL, data_status TEXT DEFAULT 'SIMULATED'
+            );
+
             CREATE TABLE IF NOT EXISTS experiments(
                 id INTEGER PRIMARY KEY,
                 ts TEXT, ts_epoch REAL,
@@ -227,6 +319,9 @@ def init():
             CREATE INDEX IF NOT EXISTS idx_opportunities_score ON opportunities(score);
             CREATE INDEX IF NOT EXISTS idx_strategies_confidence ON strategies(confidence);
             CREATE INDEX IF NOT EXISTS idx_catstats_category ON strategy_category_stats(category);
+            CREATE INDEX IF NOT EXISTS idx_affexp_ts_epoch ON affiliate_experiments(ts_epoch);
+            CREATE INDEX IF NOT EXISTS idx_affexp_niche ON affiliate_experiments(niche);
+            CREATE INDEX IF NOT EXISTS idx_affnichestats_niche ON affiliate_niche_stats(niche);
             """
         )
 
@@ -243,8 +338,13 @@ def init():
                 ("probability", "REAL"), ("expected_profit", "REAL"), ("actual_profit", "REAL"),
                 ("rotation_days", "REAL"), ("outcome", "TEXT"), ("lesson", "TEXT"),
                 ("confidence", "REAL"), ("prediction_error", "REAL"), ("ts_epoch", "REAL"),
+                ("data_status", "TEXT DEFAULT 'SIMULATED'"),
             ],
-            "opportunities": [("ts_epoch", "REAL")],
+            "opportunities": [
+                ("ts_epoch", "REAL"),
+                ("data_status", "TEXT DEFAULT 'SIMULATED'"),
+                ("recommended_action", "TEXT"),
+            ],
             "metrics": [
                 ("sim_revenue", "REAL"), ("sim_profit", "REAL"), ("sim_invested", "REAL"),
                 ("experiments", "INTEGER"), ("opportunities", "INTEGER"),
@@ -272,7 +372,7 @@ def init():
             )
 
         defaults = {
-            "running": "1",
+            "running": "0",
             "simulation_only": "1",
             "max_auto_purchase": "0",
             "risk_fraction": "0.10",
@@ -286,6 +386,12 @@ def init():
         for code, name, description in STRATEGIES:
             c.execute(
                 "INSERT OR IGNORE INTO strategies(code,name,description,updated_at) VALUES(?,?,?,?)",
+                (code, name, description, now),
+            )
+
+        for code, name, description in AFFILIATE_STRATEGIES:
+            c.execute(
+                "INSERT OR IGNORE INTO affiliate_strategies(code,name,description,updated_at) VALUES(?,?,?,?)",
                 (code, name, description, now),
             )
 
@@ -513,15 +619,15 @@ def run_learning_experiment():
                 ts, ts_epoch, strategy, category, hypothesis,
                 requested_price, market_value, resale_price, fees, other_costs,
                 expected_margin, probability, expected_profit, actual_profit,
-                rotation_days, outcome, lesson, confidence, prediction_error
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                rotation_days, outcome, lesson, confidence, prediction_error, data_status
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 now_iso(), time.time(), strategy["code"], result["category"], strategy["description"],
                 result["ask"], result["market"], result["resale"], result["fees"], result["other"],
                 result["expected_margin"], result["probability"], result["expected"], result["actual"],
                 result["rotation"], result["outcome"], result["lesson"],
-                clamp(1 - result["prediction_error"]), result["prediction_error"],
+                clamp(1 - result["prediction_error"]), result["prediction_error"], "SIMULATED",
             ),
         )
         experiment_id = c.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -616,6 +722,220 @@ def run_learning_experiment():
 
 
 # ============================================================
+# AFFILIATE BRAIN — moteur d'apprentissage
+# ============================================================
+
+def choose_affiliate_strategy(niche: str | None = None):
+    """Même mécanique que choose_strategy() (bandit de Thompson +
+    exploration + calibration + poids), appliquée aux stratégies
+    d'affiliation plutôt qu'aux stratégies de revente.
+    """
+    exploration_scale = LEARNING_MODES.get(setting("learning_mode") or "adaptive", 0.30)
+
+    with get_db() as c:
+        rows = c.execute("SELECT * FROM affiliate_strategies").fetchall()
+        niche_stats = {}
+        if niche:
+            niche_stats = {
+                r["strategy_code"]: r
+                for r in c.execute(
+                    "SELECT * FROM affiliate_niche_stats WHERE niche=?", (niche,)
+                ).fetchall()
+            }
+
+    candidates = []
+    for r in rows:
+        nstat = niche_stats.get(r["code"])
+        if nstat and nstat["tests"] >= 3:
+            wins_eff, losses_eff, tests_eff = nstat["wins"], nstat["losses"], nstat["tests"]
+        else:
+            wins_eff, losses_eff, tests_eff = r["wins"], r["losses"], r["tests"]
+
+        posterior = random.betavariate(wins_eff + 1, losses_eff + 1)
+        exploration = exploration_scale / math.sqrt(tests_eff + 1)
+        weight = clamp(float(r["weight"] or 1.0), 0.2, 2.0)
+
+        value = (posterior + exploration + 0.15 * float(r["confidence"])) * weight
+        candidates.append((value, r))
+
+    return max(candidates, key=lambda x: x[0])[1]
+
+
+_AFFILIATE_NICHE_MULTIPLIERS = {
+    "tech_gadgets": 1.15, "fitness": 1.00, "beaute": 1.05, "maison_connectee": 1.10,
+    "cuisine": 0.95, "mode": 0.90, "jeux_video": 1.00, "finance_perso": 1.20,
+}
+
+_AFFILIATE_STRATEGY_PARAMS = {
+    # code: (traffic_min, traffic_max, conv_min, conv_max, commission_min, commission_max, cost_min, cost_max)
+    "seo_blog":            (200, 2000, 0.010, 0.030, 3, 15, 5, 20),
+    "youtube_review":      (500, 5000, 0.020, 0.040, 5, 25, 10, 50),
+    "tiktok_short":        (1000, 20000, 0.003, 0.015, 2, 10, 0, 10),
+    "comparison_site":     (300, 3000, 0.020, 0.050, 5, 20, 10, 40),
+    "email_list":          (100, 1500, 0.030, 0.080, 5, 20, 5, 15),
+    "paid_ads":            (500, 5000, 0.010, 0.030, 5, 20, 50, 300),
+    "instagram_influence": (300, 4000, 0.005, 0.020, 3, 15, 0, 20),
+    "coupon_deals":        (1000, 10000, 0.010, 0.040, 1, 5, 5, 20),
+}
+
+
+def simulate_affiliate_experiment(strategy, niche):
+    (traffic_min, traffic_max, conv_min, conv_max,
+     comm_min, comm_max, cost_min, cost_max) = _AFFILIATE_STRATEGY_PARAMS[strategy["code"]]
+
+    niche_mult = _AFFILIATE_NICHE_MULTIPLIERS.get(niche, 1.0)
+
+    traffic = int(random.uniform(traffic_min, traffic_max))
+    click_through_rate = clamp(random.uniform(0.25, 0.90))
+    clicks = int(traffic * click_through_rate)
+
+    conversion_rate = clamp(random.uniform(conv_min, conv_max) * niche_mult, 0, 1)
+    conversions = int(clicks * conversion_rate)
+
+    commission_per_sale = random.uniform(comm_min, comm_max)
+    revenue = conversions * commission_per_sale
+    cost = random.uniform(cost_min, cost_max)
+    profit = revenue - cost
+
+    if profit > 1:
+        outcome = "WIN"
+    elif profit < -1:
+        outcome = "LOSS"
+    else:
+        outcome = "NEUTRAL"
+
+    lesson = (
+        f"{strategy['name']} ({niche}) : {outcome.lower()} — "
+        f"{conversions} conversions sur {clicks} clics ({conversion_rate:.1%}) — "
+        f"revenu simulé {revenue:.2f} € pour un coût de {cost:.2f} € — "
+        f"profit {profit:+.2f} €."
+    )
+
+    return {
+        "niche": niche, "traffic": traffic, "clicks": clicks, "conversions": conversions,
+        "conversion_rate": conversion_rate, "commission_per_sale": commission_per_sale,
+        "revenue": revenue, "cost": cost, "profit": profit,
+        "outcome": outcome, "lesson": lesson,
+    }
+
+
+def run_affiliate_learning_experiment():
+    niche = random.choice(AFFILIATE_NICHES)
+    strategy = choose_affiliate_strategy(niche)
+    result = simulate_affiliate_experiment(strategy, niche)
+
+    win = int(result["outcome"] == "WIN")
+    loss = int(result["outcome"] == "LOSS")
+    neutral = int(result["outcome"] == "NEUTRAL")
+
+    with get_db(write=True) as c:
+        c.execute(
+            """
+            INSERT INTO affiliate_experiments(
+                ts, ts_epoch, strategy, niche, hypothesis,
+                traffic, clicks, conversions, conversion_rate, commission_per_sale,
+                revenue, cost, profit, outcome, lesson, confidence, data_status
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                now_iso(), time.time(), strategy["code"], niche, strategy["description"],
+                result["traffic"], result["clicks"], result["conversions"],
+                result["conversion_rate"], result["commission_per_sale"],
+                result["revenue"], result["cost"], result["profit"],
+                result["outcome"], result["lesson"], strategy["confidence"], "SIMULATED",
+            ),
+        )
+        experiment_id = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        tests = strategy["tests"] + 1
+        old_confidence = float(strategy["confidence"])
+        observed = 1.0 if win else (0.5 if neutral else 0.0)
+        new_confidence = clamp(old_confidence + (observed - old_confidence) / max(8, tests))
+
+        old_weight = clamp(float(strategy["weight"] or 1.0), 0.2, 2.0)
+        weight_step = 0.03
+        if result["outcome"] == "WIN":
+            new_weight = clamp(old_weight + weight_step, 0.2, 2.0)
+        elif result["outcome"] == "LOSS":
+            new_weight = clamp(old_weight - weight_step, 0.2, 2.0)
+        else:
+            new_weight = old_weight
+
+        c.execute(
+            """
+            UPDATE affiliate_strategies SET
+                tests=?, wins=wins+?, losses=losses+?, neutrals=neutrals+?,
+                revenue_sum=revenue_sum+?, cost_sum=cost_sum+?,
+                confidence=?, weight=?, last_result=?, updated_at=?
+            WHERE id=?
+            """,
+            (
+                tests, win, loss, neutral,
+                result["revenue"], result["cost"],
+                new_confidence, new_weight, result["outcome"], now_iso(),
+                strategy["id"],
+            ),
+        )
+
+        nrow = c.execute(
+            "SELECT * FROM affiliate_niche_stats WHERE strategy_code=? AND niche=?",
+            (strategy["code"], niche),
+        ).fetchone()
+        if nrow is None:
+            c.execute(
+                "INSERT INTO affiliate_niche_stats(strategy_code,niche,tests,wins,losses,confidence) "
+                "VALUES(?,?,1,?,?,?)",
+                (strategy["code"], niche, win, loss, new_confidence),
+            )
+        else:
+            c.execute(
+                "UPDATE affiliate_niche_stats SET tests=tests+1, wins=wins+?, losses=losses+?, confidence=? "
+                "WHERE strategy_code=? AND niche=?",
+                (win, loss, new_confidence, strategy["code"], niche),
+            )
+
+        c.execute(
+            "INSERT INTO knowledge(ts,ts_epoch,topic,insight,confidence,source_type,corroboration) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (now_iso(), time.time(), "affiliate_learning", result["lesson"], new_confidence, "simulation", 0),
+        )
+
+    log_event(
+        "Affiliate Brain",
+        f"Tester « {strategy['name']} » sur {niche}",
+        (
+            f"{result['outcome']} · {result['conversions']} conversions · "
+            f"profit simulé {result['profit']:+.2f} €"
+        ),
+        result["profit"], strategy["code"], experiment_id,
+    )
+
+
+# ============================================================
+# DECISION ENGINE
+# ============================================================
+
+def choose_action(score: float, confidence: float) -> str:
+    """Traduit un score et un niveau de confiance en action recommandée.
+
+    `score` et `confidence` sont attendus sur l'échelle interne 0-1 (le
+    document de référence les décrit sur 0-100 ; les seuils ci-dessous
+    sont les mêmes, simplement ramenés à 0-1). Une confiance trop faible
+    prime toujours sur le score : NOVAREL doit vérifier avant d'agir,
+    jamais deviner à la place d'une donnée manquante.
+    """
+    if confidence < 0.35:
+        return "VERIFY"
+    if score < 0.20:
+        return "STOP"
+    if score < 0.45:
+        return "RESEARCH_MORE"
+    if score < 0.70:
+        return "TEST"
+    return "OPTIMIZE"
+
+
+# ============================================================
 # OPPORTUNITY ENGINE
 # ============================================================
 
@@ -644,19 +964,28 @@ def generate_opportunity():
 
     recommendation = "SIMULER ACHAT" if (score >= 0.68 and expected_profit > 5) else "SURVEILLER"
 
+    # Le score est un MODEL_SCORE : un indicateur interne explicable, jamais
+    # une probabilité garantie de gagner de l'argent. Toutes les valeurs
+    # d'entrée étant elles-mêmes générées aléatoirement ici, la donnée est
+    # étiquetée SIMULATED plutôt que présentée comme une observation réelle.
+    recommended_action = choose_action(score, confidence)
+    data_status = "SIMULATED"
+
     with get_db(write=True) as c:
         c.execute(
             """
             INSERT INTO opportunities(
                 ts, ts_epoch, category, item, ask_price, market_low, market_high, resale_price,
-                fees, risk, liquidity, trend, confidence, score, expected_profit, recommendation, evidence
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                fees, risk, liquidity, trend, confidence, score, expected_profit, recommendation, evidence,
+                data_status, recommended_action
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 now_iso(), time.time(), category, f"Opportunité simulée — {category}", ask,
                 market * 0.90, market * 1.10, resale, fees, risk, liquidity, trend,
                 confidence, score, expected_profit, recommendation,
                 "Données synthétiques de laboratoire.",
+                data_status, recommended_action,
             ),
         )
         c.execute(
@@ -666,7 +995,10 @@ def generate_opportunity():
 
     log_event(
         "Buyer Brain", "Évaluer opportunité",
-        f"{recommendation} · score {score:.0%} · profit attendu {expected_profit:+.2f} €",
+        (
+            f"{recommendation} · action {recommended_action} · "
+            f"MODEL_SCORE {score:.0%} · profit attendu (simulé) {expected_profit:+.2f} €"
+        ),
         score,
     )
 
@@ -864,11 +1196,13 @@ def cycle():
     choice = random.random()
     if choice < 0.10:
         generate_curiosity_question()
-    elif choice < 0.65:
+    elif choice < 0.45:
         run_learning_experiment()
-    elif choice < 0.85:
+    elif choice < 0.60:
+        run_affiliate_learning_experiment()
+    elif choice < 0.80:
         generate_opportunity()
-    elif choice < 0.95:
+    elif choice < 0.92:
         propose_improvement()
     else:
         run_verification()
@@ -987,6 +1321,15 @@ def state():
         curiosity = [dict(x) for x in c.execute(
             "SELECT * FROM curiosity_questions WHERE status='open' ORDER BY priority DESC, id DESC LIMIT 8"
         )]
+        affiliate_strategies = [dict(x) for x in c.execute(
+            """
+            SELECT *, CASE WHEN tests = 0 THEN 0 ELSE CAST(wins AS REAL) / tests END AS win_rate
+            FROM affiliate_strategies ORDER BY confidence DESC
+            """
+        )]
+        affiliate_experiments = [dict(x) for x in c.execute(
+            "SELECT * FROM affiliate_experiments ORDER BY id DESC LIMIT 12"
+        )]
         metrics_row = c.execute("SELECT * FROM metrics ORDER BY id DESC LIMIT 1").fetchone()
         metrics = dict(metrics_row) if metrics_row else {}
 
@@ -1006,6 +1349,8 @@ def state():
             "improvements": improvements,
             "gates": gates,
             "curiosity": curiosity,
+            "affiliate_strategies": affiliate_strategies,
+            "affiliate_experiments": affiliate_experiments,
             "metrics": metrics,
         }
     )
@@ -1099,6 +1444,7 @@ def reset_simulation():
         for table in [
             "events", "experiments", "opportunities", "knowledge",
             "improvements", "gates", "curiosity_questions", "strategy_category_stats",
+            "affiliate_experiments", "affiliate_niche_stats",
         ]:
             c.execute(f"DELETE FROM {table}")
 
@@ -1108,6 +1454,17 @@ def reset_simulation():
                 tests=0, wins=0, losses=0, neutrals=0,
                 profit_sum=0, expected_sum=0, rotation_sum=0,
                 confidence=0.50, weight=1.0, calibration_error=0,
+                last_result=NULL, updated_at=?
+            """,
+            (now_iso(),),
+        )
+
+        c.execute(
+            """
+            UPDATE affiliate_strategies SET
+                tests=0, wins=0, losses=0, neutrals=0,
+                revenue_sum=0, cost_sum=0,
+                confidence=0.50, weight=1.0,
                 last_result=NULL, updated_at=?
             """,
             (now_iso(),),
@@ -1308,6 +1665,36 @@ def analysis_center_data():
             "ORDER BY priority DESC LIMIT 10"
         )]
 
+        recent_opportunities = [dict(x) for x in c.execute(
+            "SELECT ts, category, score, confidence, expected_profit, recommendation, "
+            "recommended_action, data_status FROM opportunities ORDER BY id DESC LIMIT 15"
+        )]
+
+        affiliate_strategies = [dict(x) for x in c.execute(
+            """
+            SELECT *, CASE WHEN tests=0 THEN 0 ELSE CAST(wins AS REAL)/tests END win_rate
+            FROM affiliate_strategies ORDER BY confidence DESC, tests DESC LIMIT 12
+            """
+        )]
+        affiliate_best_niche = [dict(x) for x in c.execute(
+            """
+            SELECT ans.niche, s.name AS strategy, ans.tests,
+                   CASE WHEN ans.tests=0 THEN 0 ELSE CAST(ans.wins AS REAL)/ans.tests END win_rate
+            FROM affiliate_niche_stats ans
+            JOIN affiliate_strategies s ON s.code = ans.strategy_code
+            WHERE ans.tests >= 3
+            ORDER BY win_rate DESC LIMIT 12
+            """
+        )]
+        affiliate_history = [dict(x) for x in c.execute(
+            "SELECT ts, strategy, niche, clicks, conversions, revenue, cost, profit, outcome, lesson "
+            "FROM affiliate_experiments ORDER BY id DESC LIMIT 15"
+        )]
+        affiliate_totals = c.execute(
+            "SELECT COUNT(*) n, SUM(revenue) revenue, SUM(cost) cost, SUM(profit) profit, "
+            "SUM(conversions) conversions FROM affiliate_experiments"
+        ).fetchone()
+
     long_term = [
         {"label": "Expériences totales", "value": str(totals["experiments"])},
         {"label": "Opportunités totales", "value": str(totals["opportunities"])},
@@ -1335,7 +1722,18 @@ def analysis_center_data():
         "categories": categories,
         "category_best": category_best,
         "curiosity_open": curiosity_open,
+        "recent_opportunities": recent_opportunities,
         "history": history,
+        "affiliate_strategies": affiliate_strategies,
+        "affiliate_best_niche": affiliate_best_niche,
+        "affiliate_history": affiliate_history,
+        "affiliate_totals": {
+            "n": affiliate_totals["n"] or 0,
+            "revenue": affiliate_totals["revenue"] or 0.0,
+            "cost": affiliate_totals["cost"] or 0.0,
+            "profit": affiliate_totals["profit"] or 0.0,
+            "conversions": affiliate_totals["conversions"] or 0,
+        },
         "long_term": long_term,
         "quality": quality,
     }
@@ -1400,6 +1798,23 @@ input.tiny{width:100%;background:#0d1927;border:1px solid #29405a;border-radius:
 <div class="panel"><h2>Questions ouvertes (curiosité)</h2><div id="curiosity" class="list"></div></div>
 </div>
 
+<div class="panel" style="margin-top:12px"><h2>Opportunités récentes — MODEL_SCORE (jamais une probabilité garantie)</h2><div id="opportunities" class="list"></div></div>
+
+<div class="grid" style="margin-top:12px">
+<div class="panel"><div class="small">Affiliation — expériences</div><div id="aff_n" class="big">—</div><div class="muted">simulées</div></div>
+<div class="panel"><div class="small">Revenu simulé</div><div id="aff_revenue" class="big">—</div><div class="muted">brut, avant coûts</div></div>
+<div class="panel"><div class="small">Coût simulé</div><div id="aff_cost" class="big">—</div><div class="muted">production / achat trafic</div></div>
+<div class="panel"><div class="small">Profit simulé</div><div id="aff_profit" class="big">—</div><div id="aff_conversions" class="muted">—</div></div>
+</div>
+
+<div class="grid2">
+<div class="panel"><h2>Stratégies d'affiliation</h2><div id="aff_strategies" class="list"></div></div>
+<div class="panel"><h2>Meilleure stratégie par niche</h2><div id="aff_best_niche" class="list"></div></div>
+</div>
+
+<div class="panel" style="margin-top:12px"><h2>Affiliation — historique récent</h2>
+<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Stratégie</th><th>Niche</th><th>Clics</th><th>Conversions</th><th>Résultat</th><th>Leçon</th></tr></thead><tbody id="aff_history"></tbody></table></div></div>
+
 <div class="panel" style="margin-top:12px"><h2>Historique : prédiction → résultat → erreur → leçon</h2>
 <div style="overflow:auto"><table><thead><tr><th>Date</th><th>Stratégie</th><th>Catégorie</th><th>Prédiction</th><th>Résultat</th><th>Erreur</th><th>Leçon</th></tr></thead><tbody id="history"></tbody></table></div></div>
 
@@ -1450,8 +1865,21 @@ function renderData(d){
   $("strategies").innerHTML=d.strategies.length?d.strategies.map(x=>`<div class="row"><span><b>${esc(x.name)}</b><br><span class="small">${x.tests} tests · ${x.wins} succès · ${x.losses} échecs · poids ${num(x.weight)}</span></span><b>${pct(x.confidence)}</b></div>`).join(""):"<div class=\"muted\">Aucune stratégie.</div>";
   $("category_best").innerHTML=d.category_best.length?d.category_best.map(x=>`<div class="row"><span>${esc(x.category)}<br><span class="small">${esc(x.strategy)} · ${x.tests} tests</span></span><b>${pct(x.win_rate)}</b></div>`).join(""):"<div class=\"muted\">Pas encore assez de données par catégorie.</div>";
   $("categories").innerHTML=d.categories.length?d.categories.map(x=>`<div class="row"><span>${esc(x.category||"Non classé")}</span><b>${x.count}</b></div>`).join(""):"<div class=\"muted\">Aucune catégorie.</div>";
+  const actionColor={STOP:"bad",DO_NOT_EXECUTE:"bad",VERIFY:"warn",RESEARCH_MORE:"warn",TEST:"",OPTIMIZE:"good",SCALE:"good",WAIT:""};
+  $("opportunities").innerHTML=d.recent_opportunities.length?d.recent_opportunities.map(x=>`<div class="row"><span>${esc(x.category)} · <span class="small">${esc(x.ts)}</span><br><span class="small">${esc(x.recommendation)} · statut donnée : ${esc(x.data_status)}</span></span><span style="text-align:right"><b class="${actionColor[x.recommended_action]||''}">${esc(x.recommended_action)}</b><br><span class="small">MODEL_SCORE ${pct(x.score)} · profit attendu (simulé) ${num(x.expected_profit)} €</span></span></div>`).join(""):"<div class=\"muted\">Aucune opportunité pour l'instant.</div>";
   $("curiosity").innerHTML=d.curiosity_open.length?d.curiosity_open.map(x=>`<div class="event"><b>${esc(x.question)}</b><div class="small">${esc(x.topic)} · priorité ${pct(x.priority)}</div><input class="tiny" id="answer_${x.id}" placeholder="Répondre (optionnel)…"><button class="tiny" style="margin-top:5px" onclick="resolveCuriosity(${x.id})">Marquer résolue</button></div>`).join(""):"<div class=\"muted\">Aucune question ouverte.</div>";
   $("history").innerHTML=d.history.length?d.history.map(x=>`<tr><td>${esc(x.ts)}</td><td>${esc(x.strategy)}</td><td>${esc(x.category)}</td><td>${pct(x.probability)}</td><td>${esc(x.outcome)} · ${num(x.actual_profit)} €</td><td>${pct(x.prediction_error)}</td><td>${esc(x.lesson)}</td></tr>`).join(""):"<tr><td colspan=\"7\" class=\"muted\">Pas encore d'expériences.</td></tr>";
+
+  const at=d.affiliate_totals;
+  $("aff_n").textContent=at.n;
+  $("aff_revenue").textContent=num(at.revenue)+" €";
+  $("aff_cost").textContent=num(at.cost)+" €";
+  $("aff_profit").textContent=num(at.profit)+" €";
+  $("aff_conversions").textContent=at.conversions+" conversions simulées";
+  $("aff_strategies").innerHTML=d.affiliate_strategies.length?d.affiliate_strategies.map(x=>`<div class="row"><span><b>${esc(x.name)}</b><br><span class="small">${x.tests} tests · ${x.wins} succès · ${x.losses} échecs · poids ${num(x.weight)}</span></span><b>${pct(x.confidence)}</b></div>`).join(""):"<div class=\"muted\">Aucune stratégie testée.</div>";
+  $("aff_best_niche").innerHTML=d.affiliate_best_niche.length?d.affiliate_best_niche.map(x=>`<div class="row"><span>${esc(x.niche)}<br><span class="small">${esc(x.strategy)} · ${x.tests} tests</span></span><b>${pct(x.win_rate)}</b></div>`).join(""):"<div class=\"muted\">Pas encore assez de données par niche.</div>";
+  $("aff_history").innerHTML=d.affiliate_history.length?d.affiliate_history.map(x=>`<tr><td>${esc(x.ts)}</td><td>${esc(x.strategy)}</td><td>${esc(x.niche)}</td><td>${x.clicks}</td><td>${x.conversions}</td><td>${esc(x.outcome)} · ${num(x.profit)} €</td><td>${esc(x.lesson)}</td></tr>`).join(""):"<tr><td colspan=\"7\" class=\"muted\">Pas encore d'expériences d'affiliation.</td></tr>";
+
   $("long").innerHTML=d.long_term.map(x=>`<div class="row"><span>${esc(x.label)}</span><b>${esc(x.value)}</b></div>`).join("");
   $("quality").innerHTML=d.quality.map(x=>`<div class="row"><span>${esc(x.label)}</span><b class="${esc(x.kind||"")}">${esc(x.value)}</b></div>`).join("");
  }catch(e){
