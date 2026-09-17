@@ -16,7 +16,9 @@ pas configurée avec le vrai identifiant.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime
@@ -79,6 +81,29 @@ def init():
 
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+MONTHS_FR = [
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+]
+
+
+def today_fr() -> str:
+    d = datetime.now()
+    return f"{d.day} {MONTHS_FR[d.month - 1]} {d.year}"
+
+
+def _extract_price(price_str: str):
+    """Extrait le premier montant chiffré réellement présent dans le texte du prix.
+    Ne fabrique jamais de valeur : renvoie (None, None) si aucun montant n'est trouvé.
+    """
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(€|\$)", price_str)
+    if not m:
+        return None, None
+    amount = float(m.group(1).replace(",", "."))
+    currency = "EUR" if m.group(2) == "€" else "USD"
+    return amount, currency
 
 
 def amazon_search_link(query: str) -> str:
@@ -160,6 +185,22 @@ ARTICLE_INTRO_CAMERAS = (
     "dépenser un centime de plus après l'achat."
 )
 
+FAQ_CAMERAS = [
+    (
+        "Est-ce légal d'installer une caméra de surveillance chez moi ?",
+        "Oui, sous réserve de respecter les règles fixées par la CNIL : vous ne pouvez filmer que "
+        "l'intérieur de votre propriété (maison, jardin, allée privée), jamais la voie publique ni "
+        "la propriété de vos voisins. Si une personne extérieure au foyer entre régulièrement chez "
+        "vous, elle doit être informée de la présence de la caméra.",
+    ),
+    (
+        "Où faut-il placer une caméra extérieure pour qu'elle soit efficace ?",
+        "Les emplacements les plus utiles sont l'entrée principale (à 2,5–3 m de hauteur), le "
+        "portail ou garage pour surveiller les véhicules, la façade arrière souvent la plus isolée, "
+        "et les angles de la maison qui permettent de couvrir deux façades avec un seul appareil.",
+    ),
+]
+
 PLACEMENT_TIPS = [
     ("Entrée principale", "Au-dessus de la porte, à 2,5–3 m de hauteur, couvrant l'allée d'accès."),
     ("Portail / garage", "Vue sur les véhicules entrant et sortant."),
@@ -226,6 +267,22 @@ ARTICLE_INTRO_ALARMS = (
     "abonnement optionnel, voire aucun abonnement du tout."
 )
 
+FAQ_ALARMS = [
+    (
+        "Existe-t-il une limite légale de bruit pour une sirène d'alarme ?",
+        "Il n'existe pas de norme nationale unique en France : ce sont les préfectures et "
+        "municipalités qui fixent les règles. La référence la plus utilisée est 105 dB(A) mesurés "
+        "à 1 mètre, pour une durée maximale de 3 minutes pour les sirènes extérieures ; au-delà, un "
+        "trouble de voisinage reste possible même si l'installation elle-même est légale.",
+    ),
+    (
+        "Une alarme maison nécessite-t-elle forcément un abonnement ?",
+        "Non. Les 4 systèmes de ce comparatif fonctionnent avec un abonnement optionnel, voire sans "
+        "aucun abonnement, contrairement aux offres de télésurveillance classiques qui imposent "
+        "souvent 30 à 50 €/mois.",
+    ),
+]
+
 
 # ============================================================
 # CONTENU RÉEL — article comparatif serrures connectées (niche #3)
@@ -285,6 +342,22 @@ ARTICLE_INTRO_LOCKS = (
     "populaires n'ont jamais été soumises à cette certification. Ce comparatif vous dit ce que "
     "chaque modèle change vraiment côté sécurité, pas seulement côté confort."
 )
+
+FAQ_LOCKS = [
+    (
+        "Qu'est-ce que la certification A2P sur une serrure ?",
+        "C'est une certification délivrée par le CNPP, organisme indépendant créé par les "
+        "assureurs, qui évalue la résistance à l'effraction : une étoile = 5 minutes de résistance "
+        "testée en laboratoire, deux étoiles = 10 minutes, trois étoiles = 15 minutes. La plupart "
+        "des contrats habitation exigent au moins deux étoiles pour une maison.",
+    ),
+    (
+        "Une serrure connectée peut-elle réduire l'indemnisation en cas de cambriolage ?",
+        "Oui, si elle ne correspond pas à ce qu'exige votre contrat d'assurance. Il est recommandé "
+        "de demander une confirmation écrite à votre assureur avant l'installation plutôt que de le "
+        "découvrir après un sinistre.",
+    ),
+]
 
 
 # ============================================================
@@ -346,6 +419,20 @@ ARTICLE_INTRO_SMOKE = (
     "habitation. Autant choisir un modèle qui vous prévient même quand vous n'êtes pas chez vous."
 )
 
+FAQ_SMOKE = [
+    (
+        "Le détecteur de fumée est-il obligatoire en France ?",
+        "Oui, depuis la loi Morange du 8 mars 2015, tout logement doit être équipé d'au moins un "
+        "détecteur autonome avertisseur de fumée (DAAF) conforme à la norme NF EN 14604 et marqué "
+        "CE, avec une alerte sonore d'au moins 85 dB(A) mesurée à 3 mètres.",
+    ),
+    (
+        "Qui doit installer le détecteur de fumée en location, le propriétaire ou le locataire ?",
+        "C'est le propriétaire qui doit l'installer ; le locataire est responsable de son entretien "
+        "pendant la durée du bail.",
+    ),
+]
+
 
 # ============================================================
 # CONTENU RÉEL — article comparatif détecteurs de fuite d'eau (niche #5)
@@ -393,6 +480,23 @@ ARTICLE_INTRO_WATER_LEAK = (
     "avant que ça ne dégénère. C'est aussi la seule catégorie de ce comparatif où plusieurs "
     "assureurs offrent une vraie réduction de prime pour en installer."
 )
+
+FAQ_WATER_LEAK = [
+    (
+        "Un détecteur de fuite d'eau peut-il faire baisser mon assurance habitation ?",
+        "Chez plusieurs assureurs français, oui : MAIF et GMF jusqu'à 12% via des partenariats avec "
+        "Netatmo et Somfy, Allianz jusqu'à 15% via Homiris, Cardif jusqu'à 15% selon un "
+        "questionnaire sur les équipements déclarés. La fourchette observée sur le marché est de "
+        "10 à 25% de réduction de prime — à vérifier directement avec votre assureur.",
+    ),
+    (
+        "Combien de capteurs faut-il installer dans une maison ?",
+        "Il est recommandé de placer au moins un capteur sous chaque point à risque (évier, "
+        "lave-linge, lave-vaisselle, chauffe-eau, WC) plutôt qu'un seul capteur pour toute la "
+        "maison : c'est la position du capteur, pas son nombre total, qui détermine si la fuite est "
+        "repérée à temps.",
+    ),
+]
 
 
 # ============================================================
@@ -447,6 +551,19 @@ th{color:#8fa3b7}
 .tips{background:#0f1620;border-left:3px solid #7ec4ff;border-radius:8px;padding:14px 18px;margin:18px 0}
 .tips b{display:block;margin-bottom:2px}
 footer{color:#6b7c8d;font-size:13px;margin-top:40px;border-top:1px solid var(--border);padding-top:16px}
+footer a{color:#8fa3b7}
+
+.breadcrumb{font-size:13px;color:var(--muted);margin:0 0 6px}
+.breadcrumb a{color:var(--muted);text-decoration:underline}
+.updated-date{color:var(--muted);font-size:13px;margin:0 0 18px}
+
+.mobile-buybar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;align-items:center;justify-content:space-between;gap:12px;background:#111925;border-top:1px solid var(--border);padding:10px 14px;box-shadow:0 -6px 20px rgba(0,0,0,.4)}
+.mobile-buybar-name{font-weight:700;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mobile-buybar .btn{margin-top:0;padding:9px 16px;white-space:nowrap;flex-shrink:0}
+@media (max-width:680px){
+.mobile-buybar{display:flex}
+main{padding-bottom:88px}
+}
 """
 
 
@@ -460,12 +577,165 @@ NAV_LINKS = [
     ("/detecteurs-fuite-eau-connectes", "💧 Fuite d'eau"),
 ]
 
+CATEGORY_LABEL = {
+    "/cameras-exterieures-sans-abonnement": "Caméras extérieures",
+    "/alarmes-maison-sans-abonnement": "Alarmes maison",
+    "/serrures-connectees-sans-abonnement": "Serrures connectées",
+    "/detecteurs-fumee-connectes": "Détecteurs de fumée",
+    "/detecteurs-fuite-eau-connectes": "Détecteurs de fuite d'eau",
+}
 
-def render_page(title: str, body: str, description: str = "", path: str = "/") -> str:
+ARTICLES_INFO = {
+    "/cameras-exterieures-sans-abonnement": {
+        "emoji": "📷", "title": "Caméras extérieures",
+        "desc": "4 modèles comparés sans abonnement.",
+    },
+    "/alarmes-maison-sans-abonnement": {
+        "emoji": "🚨", "title": "Alarmes maison",
+        "desc": "4 systèmes qui fonctionnent sans abonnement obligatoire.",
+    },
+    "/serrures-connectees-sans-abonnement": {
+        "emoji": "🔒", "title": "Serrures connectées",
+        "desc": "4 modèles, et le point assurance à vérifier avant d'acheter.",
+    },
+    "/detecteurs-fumee-connectes": {
+        "emoji": "🔥", "title": "Détecteurs de fumée",
+        "desc": "Obligation légale : comment bien le choisir.",
+    },
+    "/detecteurs-fuite-eau-connectes": {
+        "emoji": "💧", "title": "Détecteurs de fuite d'eau",
+        "desc": "Le détecteur le plus rentable de la maison.",
+    },
+}
+
+RELATED_ARTICLES = {
+    "/cameras-exterieures-sans-abonnement": [
+        "/alarmes-maison-sans-abonnement", "/serrures-connectees-sans-abonnement",
+    ],
+    "/alarmes-maison-sans-abonnement": [
+        "/cameras-exterieures-sans-abonnement", "/serrures-connectees-sans-abonnement",
+    ],
+    "/serrures-connectees-sans-abonnement": [
+        "/alarmes-maison-sans-abonnement", "/cameras-exterieures-sans-abonnement",
+    ],
+    "/detecteurs-fumee-connectes": [
+        "/detecteurs-fuite-eau-connectes", "/alarmes-maison-sans-abonnement",
+    ],
+    "/detecteurs-fuite-eau-connectes": [
+        "/detecteurs-fumee-connectes", "/alarmes-maison-sans-abonnement",
+    ],
+}
+
+
+def breadcrumb_html(path: str, qs: str) -> str:
+    home_href = f"/{qs}"
+    label = CATEGORY_LABEL[path]
+    return (
+        '<nav class="breadcrumb" aria-label="Fil d\'Ariane">'
+        f'<a href="{home_href}">Accueil</a> <span aria-hidden="true">›</span> '
+        f'<span aria-current="page">{label}</span>'
+        "</nav>"
+    )
+
+
+def breadcrumb_jsonld(path: str) -> dict:
+    return {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Accueil", "item": f"{SITE_URL}/"},
+            {"@type": "ListItem", "position": 2, "name": CATEGORY_LABEL[path], "item": f"{SITE_URL}{path}"},
+        ],
+    }
+
+
+def products_jsonld(products: list) -> list:
+    items = []
+    for p in products:
+        amount, currency = _extract_price(p["price"])
+        offer = {"@type": "Offer", "url": f"{SITE_URL}/go/{p['slug']}"}
+        if amount is not None:
+            offer["price"] = amount
+            offer["priceCurrency"] = currency
+        items.append({
+            "@type": "Product",
+            "name": p["name"],
+            "description": p["pros"],
+            "offers": offer,
+        })
+    return items
+
+
+def faq_jsonld(faq: list) -> dict:
+    return {
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": q,
+                "acceptedAnswer": {"@type": "Answer", "text": a},
+            }
+            for q, a in faq
+        ],
+    }
+
+
+def jsonld_script(parts: list) -> str:
+    graph = {"@context": "https://schema.org", "@graph": parts}
+    data = json.dumps(graph, ensure_ascii=False).replace("</", "<\\/")
+    return f'<script type="application/ld+json">{data}</script>'
+
+
+def article_jsonld(path: str, products: list, faq: list) -> str:
+    parts = [breadcrumb_jsonld(path)]
+    parts.extend(products_jsonld(products))
+    if faq:
+        parts.append(faq_jsonld(faq))
+    return jsonld_script(parts)
+
+
+def faq_html(faq: list) -> str:
+    if not faq:
+        return ""
+    items = "".join(f'<div class="card"><h3>{q}</h3><p>{a}</p></div>' for q, a in faq)
+    return f"<h2>Questions fréquentes</h2>{items}"
+
+
+def related_html(path: str, qs: str) -> str:
+    related = RELATED_ARTICLES.get(path, [])
+    if not related:
+        return ""
+    cards = "".join(
+        f'<a class="niche-card" href="{p}{qs}">'
+        f'<span class="niche-icon" aria-hidden="true">{ARTICLES_INFO[p]["emoji"]}</span>'
+        f'<h3>{ARTICLES_INFO[p]["title"]}</h3>'
+        f'<p>{ARTICLES_INFO[p]["desc"]}</p>'
+        "</a>"
+        for p in related
+    )
+    return f'<h2>Voir aussi</h2><div class="niche-grid">{cards}</div>'
+
+
+def render_page(
+    title: str,
+    body: str,
+    description: str = "",
+    path: str = "/",
+    extra_head: str = "",
+    sticky: tuple | None = None,
+) -> str:
     desc = description or "Comparatifs indépendants de sécurité domestique : caméras, alarmes, serrures connectées. Prix réels, avis honnêtes, sans abonnement caché."
     canonical = f"{SITE_URL}{path}"
     qs = _qs(_src())
     nav_html = "".join(f'<a href="{href}{qs}">{label}</a>' for href, label in NAV_LINKS)
+    sticky_html = ""
+    if sticky:
+        sticky_name, sticky_slug = sticky
+        sticky_html = (
+            '<div class="mobile-buybar">'
+            f'<span class="mobile-buybar-name">{sticky_name}</span>'
+            f'<a class="btn mobile-buybar-btn" href="/go/{sticky_slug}{qs}">Voir le prix →</a>'
+            "</div>"
+        )
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title>
@@ -479,16 +749,18 @@ def render_page(title: str, body: str, description: str = "", path: str = "/") -
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>{BASE_STYLE}</style></head>
+<style>{BASE_STYLE}</style>{extra_head}</head>
 <body>
 <header class="site-header"><div class="header-inner">
-<a class="logo" href="/{qs}"><span class="logo-dot"></span>NOVAREL</a>
+<a class="logo" href="/{qs}"><span class="logo-dot" aria-hidden="true"></span>NOVAREL</a>
 <nav class="site-nav">{nav_html}</nav>
 </div></header>
 <main>{body}
 <footer>Ce site perçoit une commission sur les achats réalisés via les liens Amazon ci-dessus, sans coût
-supplémentaire pour vous. Les avis et comparatifs restent indépendants.</footer>
-</main></body></html>"""
+supplémentaire pour vous. Les avis et comparatifs restent indépendants. <a href="/methodologie{qs}">Notre méthodologie</a>.</footer>
+</main>
+{sticky_html}
+</body></html>"""
 
 
 def _src() -> str:
@@ -509,27 +781,27 @@ def home():
 <p class="lede">On compare des produits réels, sur des critères concrets — jamais de note inventée.</p>
 <div class="niche-grid">
 <a class="niche-card" href="/cameras-exterieures-sans-abonnement{qs}">
-<span class="niche-icon">📷</span>
+<span class="niche-icon" aria-hidden="true">📷</span>
 <h3>Caméras extérieures</h3>
 <p>4 modèles comparés sur le seul critère qui compte vraiment : est-ce que ça marche encore une fois l'abonnement refusé ?</p>
 </a>
 <a class="niche-card" href="/alarmes-maison-sans-abonnement{qs}">
-<span class="niche-icon">🚨</span>
+<span class="niche-icon" aria-hidden="true">🚨</span>
 <h3>Alarmes maison</h3>
 <p>4 systèmes qui fonctionnent sans abonnement obligatoire — et ce que dit vraiment la loi sur les sirènes.</p>
 </a>
 <a class="niche-card" href="/serrures-connectees-sans-abonnement{qs}">
-<span class="niche-icon">🔒</span>
+<span class="niche-icon" aria-hidden="true">🔒</span>
 <h3>Serrures connectées</h3>
 <p>4 modèles comparés, et le détail assurance que presque personne ne vérifie avant d'acheter.</p>
 </a>
 <a class="niche-card" href="/detecteurs-fumee-connectes{qs}">
-<span class="niche-icon">🔥</span>
+<span class="niche-icon" aria-hidden="true">🔥</span>
 <h3>Détecteurs de fumée</h3>
 <p>Seul produit du site qui est une obligation légale — voici comment bien le choisir.</p>
 </a>
 <a class="niche-card" href="/detecteurs-fuite-eau-connectes{qs}">
-<span class="niche-icon">💧</span>
+<span class="niche-icon" aria-hidden="true">💧</span>
 <h3>Détecteurs de fuite d'eau</h3>
 <p>Le détecteur le plus rentable de la maison — et celui qui fait vraiment baisser votre assurance.</p>
 </a>
@@ -543,7 +815,10 @@ def home():
     )
 
 
-def _render_comparatif(title: str, badge: str, intro: str, products: list, extra_html: str = "") -> str:
+def _render_comparatif(
+    title: str, badge: str, intro: str, products: list, path: str,
+    faq: list, extra_html: str = "",
+) -> str:
     src = _src()
     qs = _qs(src)
     cards = ""
@@ -571,7 +846,9 @@ def _render_comparatif(title: str, badge: str, intro: str, products: list, extra
         for p in products
     )
     body = f"""
+{breadcrumb_html(path, qs)}
 <span class="badge">{badge}</span>
+<p class="updated-date">Dernière mise à jour : {today_fr()}</p>
 <h1>{title}</h1>
 <p class="lede">{intro}</p>
 
@@ -583,6 +860,8 @@ def _render_comparatif(title: str, badge: str, intro: str, products: list, extra
 {extra_html}
 <p class="lede" style="margin-top:24px">Les prix indiqués sont des ordres de grandeur constatés au moment de la rédaction ;
 vérifiez le prix actuel avant achat, il évolue régulièrement.</p>
+{faq_html(faq)}
+{related_html(path, qs)}
 """
     return body
 
@@ -600,18 +879,23 @@ def article_cameras():
 <p>Une caméra mal placée manque les intrusions ou devient inutilisable à cause de l'éblouissement solaire.</p>
 {tips_html}
 """
+    path = "/cameras-exterieures-sans-abonnement"
     body = _render_comparatif(
         "Meilleures caméras extérieures sans abonnement",
         "Comparatif 2026",
         ARTICLE_INTRO_CAMERAS,
         CAMERAS,
+        path,
+        FAQ_CAMERAS,
         extra,
     )
     return render_page(
         "Meilleures caméras extérieures sans abonnement (2026)",
         body,
         "4 caméras extérieures qui fonctionnent vraiment sans abonnement : Reolink, Blink, EufyCam comparées sur prix, autonomie et stockage. Plus la réglementation CNIL à connaître.",
-        "/cameras-exterieures-sans-abonnement",
+        path,
+        extra_head=article_jsonld(path, CAMERAS, FAQ_CAMERAS),
+        sticky=(CAMERAS[0]["name"], CAMERAS[0]["slug"]),
     )
 
 
@@ -622,18 +906,23 @@ def article_alarms():
 <p>Contrairement à une idée reçue, il n'existe pas de norme nationale unique en France : ce sont les <strong>préfectures et municipalités</strong> qui fixent les règles précises. La référence la plus utilisée est <strong>105 dB(A) mesurés à 1 mètre, pour une durée maximale de 3 minutes</strong> pour les sirènes extérieures — au-delà, vous risquez un trouble de voisinage, et une plainte reste possible même si l'installation elle-même est légale. Les sirènes intérieures ne sont pas soumises à cette limite de durée, mais doivent respecter un cycle court dans les immeubles collectifs.</p>
 <p><strong>À retenir avant d'installer :</strong> vérifiez que votre sirène est certifiée aux normes en vigueur, et informez vos voisins directs si vous installez une sirène extérieure puissante — ça évite les tensions inutiles.</p>
 """
+    path = "/alarmes-maison-sans-abonnement"
     body = _render_comparatif(
         "Meilleures alarmes maison sans abonnement",
         "Comparatif 2026",
         ARTICLE_INTRO_ALARMS,
         ALARMS,
+        path,
+        FAQ_ALARMS,
         extra,
     )
     return render_page(
         "Meilleures alarmes maison sans abonnement (2026)",
         body,
         "Somfy, Netatmo, Ring, Ajax : 4 alarmes maison sans abonnement obligatoire comparées, plus ce que dit vraiment la loi sur les sirènes en France.",
-        "/alarmes-maison-sans-abonnement",
+        path,
+        extra_head=article_jsonld(path, ALARMS, FAQ_ALARMS),
+        sticky=(ALARMS[0]["name"], ALARMS[0]["slug"]),
     )
 
 
@@ -645,18 +934,23 @@ def article_locks():
 <p>Pour les serrures connectées spécifiquement, il existe une certification dédiée : <strong>A2P@</strong>, qui combine résistance mécanique et sécurité informatique de l'appareil et de son application. Peu de modèles grand public l'obtiennent.</p>
 <p><strong>Ce qu'il faut vérifier avant d'acheter :</strong> une serrure qui remplace uniquement le cylindre (comme la plupart des modèles de ce comparatif) conserve en général le bloc de porte existant — mais le niveau de protection global dépend de l'ensemble de l'installation, pas seulement du cylindre. Le plus sûr reste de demander confirmation écrite à votre assureur avant l'installation, plutôt que de le découvrir après un sinistre.</p>
 """
+    path = "/serrures-connectees-sans-abonnement"
     body = _render_comparatif(
         "Meilleures serrures connectées sans abonnement",
         "Comparatif 2026",
         ARTICLE_INTRO_LOCKS,
         LOCKS,
+        path,
+        FAQ_LOCKS,
         extra,
     )
     return render_page(
         "Meilleures serrures connectées sans abonnement (2026)",
         body,
         "Nuki, Yale, Somfy, SwitchBot comparées — et le point assurance (certification A2P) que la plupart des comparatifs ne mentionnent jamais.",
-        "/serrures-connectees-sans-abonnement",
+        path,
+        extra_head=article_jsonld(path, LOCKS, FAQ_LOCKS),
+        sticky=(LOCKS[0]["name"], LOCKS[0]["slug"]),
     )
 
 
@@ -668,18 +962,23 @@ def article_smoke():
 <p>En location, c'est le <strong>propriétaire</strong> qui doit l'installer ; le <strong>locataire</strong> est responsable de son entretien pendant la durée du bail. En cas d'absence de détecteur lors d'un incendie, l'indemnisation de votre assurance habitation peut être réduite — en plus du risque évident pour la sécurité du foyer.</p>
 <p><strong>Ce que la version connectée apporte en plus :</strong> une alerte sur votre téléphone même si vous n'êtes pas chez vous — utile si vous avez un animal, une location saisonnière, ou si vous voulez surveiller une résidence secondaire à distance.</p>
 """
+    path = "/detecteurs-fumee-connectes"
     body = _render_comparatif(
         "Meilleurs détecteurs de fumée connectés",
         "Obligation légale + comparatif 2026",
         ARTICLE_INTRO_SMOKE,
         SMOKE_DETECTORS,
+        path,
+        FAQ_SMOKE,
         extra,
     )
     return render_page(
         "Meilleurs détecteurs de fumée connectés (2026)",
         body,
         "Google Nest Protect, Netatmo, Somfy, X-Sense comparés — et l'obligation légale (loi Morange, norme NF EN 14604) que tout logement français doit respecter.",
-        "/detecteurs-fumee-connectes",
+        path,
+        extra_head=article_jsonld(path, SMOKE_DETECTORS, FAQ_SMOKE),
+        sticky=(SMOKE_DETECTORS[0]["name"], SMOKE_DETECTORS[0]["slug"]),
     )
 
 
@@ -690,18 +989,68 @@ def article_water_leak():
 <p>Contrairement aux alarmes anti-intrusion, les détecteurs de fuite d'eau ouvrent droit à de vraies réductions chez plusieurs assureurs français : <strong>MAIF et GMF</strong> jusqu'à 12% via des partenariats avec Netatmo et Somfy, <strong>Allianz</strong> jusqu'à 15% via Homiris, <strong>Cardif</strong> jusqu'à 15% selon un questionnaire sur les équipements déclarés, et <strong>MMA</strong> via leur contrat "Smart Home". Plus largement, la fourchette observée sur le marché est de <strong>10 à 25% de réduction de prime</strong> pour des équipements connectés déclarés et certifiés — vérifiez directement avec votre assureur avant d'acheter en vous basant uniquement sur cet argument.</p>
 <p><strong>À retenir avant d'installer :</strong> placez au moins un capteur sous chaque point à risque (évier, lave-linge, lave-vaisselle, chauffe-eau, WC), pas juste un seul pour toute la maison — c'est la position du capteur, pas le nombre d'appareils, qui détermine si la fuite est repérée à temps.</p>
 """
+    path = "/detecteurs-fuite-eau-connectes"
     body = _render_comparatif(
         "Meilleurs détecteurs de fuite d'eau connectés",
         "Comparatif 2026",
         ARTICLE_INTRO_WATER_LEAK,
         WATER_LEAK,
+        path,
+        FAQ_WATER_LEAK,
         extra,
     )
     return render_page(
         "Meilleurs détecteurs de fuite d'eau connectés (2026)",
         body,
         "SwitchBot, X-Sense, U.S. Solid comparés — et les réductions d'assurance habitation (MAIF, Allianz, Cardif) que ce détecteur peut vous faire gagner.",
-        "/detecteurs-fuite-eau-connectes",
+        path,
+        extra_head=article_jsonld(path, WATER_LEAK, FAQ_WATER_LEAK),
+        sticky=(WATER_LEAK[0]["name"], WATER_LEAK[0]["slug"]),
+    )
+
+
+@app.get("/methodologie")
+def methodologie():
+    body = f"""
+<span class="badge">Transparence</span>
+<p class="updated-date">Dernière mise à jour : {today_fr()}</p>
+<h1>Notre méthodologie</h1>
+<p class="lede">Comment sont faits les comparatifs de ce site, sans blabla.</p>
+
+<h2>Nos sources</h2>
+<p>Les informations techniques (prix, autonomie, compatibilité, résolution) proviennent des fiches
+produit officielles des fabricants, de comparatifs indépendants publiés par des médias spécialisés,
+et de la réglementation officielle en vigueur (CNIL, lois, normes NF/A2P) citée directement dans
+chaque article.</p>
+
+<h2>Nos critères de sélection</h2>
+<p>Chaque produit retenu doit fonctionner sans abonnement obligatoire pour ses fonctions essentielles
+(enregistrement, détection, alerte). Nous excluons les produits dont les fonctions de base sont
+bloquées derrière un plan payant. Le classement (#1, #2, #3) reflète le meilleur équilibre entre
+prix, autonomie sans frais récurrents et fiabilité constatée dans les retours d'utilisateurs et
+comparatifs consultés.</p>
+
+<h2>Ce que nous ne faisons pas</h2>
+<p><strong>Nous ne testons pas physiquement chaque produit.</strong> Ce site s'appuie sur l'analyse
+de fiches techniques, de comparatifs tiers et de la réglementation, pas sur des essais en conditions
+réelles menés par notre équipe. Nous ne publions aucune note chiffrée inventée : les avantages et
+inconvénients listés sont qualitatifs et sourcés.</p>
+
+<h2>Mise à jour des prix</h2>
+<p>Les prix affichés sont des ordres de grandeur constatés au moment de la rédaction de chaque
+article (voir la date de mise à jour en haut de page). Les prix réels évoluent en permanence sur
+Amazon : vérifiez toujours le prix actuel avant achat via le lien fourni.</p>
+
+<h2>Rémunération</h2>
+<p>Ce site perçoit une commission sur les achats réalisés via les liens Amazon, sans coût
+supplémentaire pour vous. Cette rémunération n'influence pas le classement : elle est identique
+quel que soit le produit acheté.</p>
+"""
+    return render_page(
+        "Méthodologie — comment sont faits nos comparatifs — NOVAREL",
+        body,
+        "Comment ce site sélectionne et compare les produits : sources utilisées, critères, absence de tests physiques déclarée honnêtement, mise à jour des prix.",
+        "/methodologie",
     )
 
 
@@ -721,6 +1070,7 @@ ARTICLE_PATHS = [
     "/serrures-connectees-sans-abonnement",
     "/detecteurs-fumee-connectes",
     "/detecteurs-fuite-eau-connectes",
+    "/methodologie",
 ]
 
 
