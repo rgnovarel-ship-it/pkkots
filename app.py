@@ -2016,3 +2016,57 @@ def api_affiliate_real_data():
         "by_product": json.loads(row["by_product"] or "{}"),
         "history": [{"ts": h["ts"], "total_clicks": h["total_clicks"]} for h in history],
     })
+
+def sync_real_affiliate_by_source():
+    import requests, json
+    site_url = os.environ.get("NOVAREL_SITE_URL", "https://novarel-site.onrender.com")
+    try:
+        resp = requests.get(site_url + "/api/clicks", timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+    by_source = data.get("by_source", [])
+    conn = sqlite3.connect(DB, timeout=30)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS real_affiliate_by_source (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT,
+            ts_epoch REAL,
+            by_source TEXT,
+            data_status TEXT DEFAULT 'OBSERVED'
+        )
+    """)
+    conn.execute(
+        "INSERT INTO real_affiliate_by_source (ts, ts_epoch, by_source, data_status) VALUES (?, ?, ?, 'OBSERVED')",
+        (datetime.utcnow().isoformat(), time.time(), json.dumps(by_source)),
+    )
+    conn.commit()
+    conn.close()
+    return {"by_source": by_source}
+
+def _real_affiliate_source_worker():
+    while True:
+        try:
+            sync_real_affiliate_by_source()
+        except Exception:
+            pass
+        time.sleep(120)
+
+threading.Thread(target=_real_affiliate_source_worker, daemon=True, name="real-affiliate-source-sync").start()
+
+@app.route("/api/affiliate/real-data-by-source")
+def api_affiliate_real_data_by_source():
+    import json
+    conn = sqlite3.connect(DB, timeout=30)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM real_affiliate_by_source ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"status": "no_data_yet"})
+    return jsonify({
+        "status": "ok",
+        "data_status": "OBSERVED",
+        "last_sync": row["ts"],
+        "by_source": json.loads(row["by_source"] or "[]"),
+    })
