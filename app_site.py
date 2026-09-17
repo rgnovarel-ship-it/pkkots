@@ -228,6 +228,66 @@ ARTICLE_INTRO_ALARMS = (
 
 
 # ============================================================
+# CONTENU RÉEL — article comparatif serrures connectées (niche #3)
+# ============================================================
+
+LOCKS = [
+    {
+        "slug": "nuki-smart-lock-ultra",
+        "name": "Nuki Smart Lock Ultra",
+        "price": "≈349 €",
+        "power": "Batterie rechargeable intégrée",
+        "resolution": "Wi-Fi, Matter, Thread, Bluetooth",
+        "storage": "Cylindre modulaire compatible 96 configurations de porte",
+        "pros": "Le plus complet techniquement, aucun abonnement pour les fonctions de base",
+        "cons": "Câble de recharge propriétaire, clavier à code vendu séparément",
+        "search_query": "Nuki Smart Lock Ultra serrure connectée",
+    },
+    {
+        "slug": "yale-linus-l2",
+        "name": "Yale Linus L2",
+        "price": "≈238 €",
+        "power": "Piles",
+        "resolution": "Bluetooth + module Wi-Fi optionnel",
+        "storage": "Compatible Google Home, Alexa",
+        "pros": "Design discret, écosystème Yale déjà installé chez beaucoup de foyers",
+        "cons": "Autonomie de la batterie parfois limitée selon l'usage",
+        "search_query": "Yale Linus L2 serrure connectée",
+    },
+    {
+        "slug": "somfy-door-keeper",
+        "name": "Somfy Door Keeper",
+        "price": "≈250–350 €",
+        "power": "Piles",
+        "resolution": "Bluetooth (Wi-Fi via passerelle TaHoma en option)",
+        "storage": "Remplace le cylindre européen existant, conserve la serrure d'origine",
+        "pros": "Certifié A2P — le seul du comparatif dans ce cas, un vrai plus pour l'assurance",
+        "cons": "Passerelle TaHoma en supplément si vous voulez le contrôle à distance",
+        "search_query": "Somfy Door Keeper serrure connectée",
+    },
+    {
+        "slug": "switchbot-lock-pro",
+        "name": "SwitchBot Lock Pro",
+        "price": "≈140 €",
+        "power": "4 piles AA (6 à 9 mois d'autonomie)",
+        "resolution": "Bluetooth (Matter via Hub 2 en option)",
+        "storage": "Portée Bluetooth jusqu'à 120 m en extérieur",
+        "pros": "L'entrée de gamme du comparatif, aucun abonnement, installation simple",
+        "cons": "Fonctions avancées (Wi-Fi, assistants vocaux) nécessitent le Hub 2 en plus",
+        "search_query": "SwitchBot Lock Pro serrure connectée",
+    },
+]
+
+ARTICLE_INTRO_LOCKS = (
+    "Une serrure connectée séduit pour le confort, mais un détail est presque toujours ignoré : "
+    "votre assurance habitation. La plupart des contrats exigent une serrure certifiée A2P pour "
+    "garantir une indemnisation en cas de cambriolage — et beaucoup de serrures connectées "
+    "populaires n'ont jamais été soumises à cette certification. Ce comparatif vous dit ce que "
+    "chaque modèle change vraiment côté sécurité, pas seulement côté confort."
+)
+
+
+# ============================================================
 # GABARIT HTML
 # ============================================================
 
@@ -287,6 +347,10 @@ def home():
 <div class="card">
 <h3><a href="/alarmes-maison-sans-abonnement{qs}">Meilleures alarmes maison sans abonnement (2026)</a></h3>
 <p>4 systèmes qui fonctionnent sans abonnement obligatoire — et ce que dit vraiment la loi sur les sirènes.</p>
+</div>
+<div class="card">
+<h3><a href="/serrures-connectees-sans-abonnement{qs}">Meilleures serrures connectées sans abonnement (2026)</a></h3>
+<p>4 modèles comparés, et le détail assurance que presque personne ne vérifie avant d'acheter.</p>
 </div>
 """
     return render_page("NOVAREL SITE — Sécurité domestique", body)
@@ -374,9 +438,27 @@ def article_alarms():
     return render_page("Meilleures alarmes maison sans abonnement (2026)", body)
 
 
+@app.get("/serrures-connectees-sans-abonnement")
+def article_locks():
+    extra = """
+<h2>Le détail que presque personne vérifie : votre assurance</h2>
+<p>Les assureurs se basent sur la certification <strong>A2P</strong> (délivrée par le CNPP, organisme indépendant créé par les assureurs) pour évaluer la résistance d'une serrure à l'effraction : une étoile = 5 minutes de résistance testée en laboratoire, deux étoiles = 10 minutes, trois étoiles = 15 minutes. La plupart des contrats habitation exigent au moins deux étoiles pour une maison. <strong>En cas de cambriolage, si la serrure installée ne correspond pas à ce qui est exigé dans votre contrat, l'indemnisation peut être réduite, voire refusée.</strong></p>
+<p>Pour les serrures connectées spécifiquement, il existe une certification dédiée : <strong>A2P@</strong>, qui combine résistance mécanique et sécurité informatique de l'appareil et de son application. Peu de modèles grand public l'obtiennent.</p>
+<p><strong>Ce qu'il faut vérifier avant d'acheter :</strong> une serrure qui remplace uniquement le cylindre (comme la plupart des modèles de ce comparatif) conserve en général le bloc de porte existant — mais le niveau de protection global dépend de l'ensemble de l'installation, pas seulement du cylindre. Le plus sûr reste de demander confirmation écrite à votre assureur avant l'installation, plutôt que de le découvrir après un sinistre.</p>
+"""
+    body = _render_comparatif(
+        "Meilleures serrures connectées sans abonnement",
+        "Comparatif 2026",
+        ARTICLE_INTRO_LOCKS,
+        LOCKS,
+        extra,
+    )
+    return render_page("Meilleures serrures connectées sans abonnement (2026)", body)
+
+
 @app.get("/go/<slug>")
 def go(slug):
-    item = next((c for c in CAMERAS + ALARMS if c["slug"] == slug), None)
+    item = next((c for c in CAMERAS + ALARMS + LOCKS if c["slug"] == slug), None)
     if not item:
         return "Lien inconnu", 404
     log_click(slug, item["name"], _src())
