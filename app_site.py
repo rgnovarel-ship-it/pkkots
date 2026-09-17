@@ -72,6 +72,9 @@ def init():
             );
             """
         )
+        cols = [r["name"] for r in c.execute("PRAGMA table_info(clicks)").fetchall()]
+        if "source" not in cols:
+            c.execute("ALTER TABLE clicks ADD COLUMN source TEXT DEFAULT 'direct'")
 
 
 def now_iso() -> str:
@@ -86,16 +89,16 @@ def amazon_search_link(query: str) -> str:
     return f"https://www.amazon.fr/s?k={quote(query)}&tag={AMAZON_TAG}"
 
 
-def log_click(slug: str, product: str):
+def log_click(slug: str, product: str, source: str = "direct"):
     with get_db(write=True) as c:
         c.execute(
-            "INSERT INTO clicks(ts,slug,product,referrer) VALUES(?,?,?,?)",
-            (now_iso(), slug, product, request.referrer or ""),
+            "INSERT INTO clicks(ts,slug,product,referrer,source) VALUES(?,?,?,?,?)",
+            (now_iso(), slug, product, request.referrer or "", source),
         )
 
 
 # ============================================================
-# CONTENU RÉEL — article de comparatif
+# CONTENU RÉEL — article comparatif caméras
 # ============================================================
 # Rassemblé à partir de recherches vérifiées (comparatifs indépendants,
 # fiches produit). Les prix sont des ordres de grandeur : à vérifier au
@@ -148,7 +151,7 @@ CAMERAS = [
     },
 ]
 
-ARTICLE_INTRO = (
+ARTICLE_INTRO_CAMERAS = (
     "« Sans abonnement » est devenu un argument marketing que presque toutes les marques "
     "utilisent — jusqu'à ce qu'on découvre, une fois la caméra installée, qu'elle n'enregistre "
     "que 24 heures sans le plan cloud payant, ou que la détection intelligente est bloquée sans "
@@ -163,6 +166,65 @@ PLACEMENT_TIPS = [
     ("Façade arrière", "La cour ou le jardin, souvent la zone la plus isolée d'un logement."),
     ("Angle de la maison", "Permet de couvrir deux façades avec un seul appareil bien placé."),
 ]
+
+
+# ============================================================
+# CONTENU RÉEL — article comparatif alarmes (niche #2)
+# ============================================================
+
+ALARMS = [
+    {
+        "slug": "somfy-home-alarm-advanced",
+        "name": "Somfy Home Alarm Advanced",
+        "price": "≈799 €",
+        "power": "Secteur + relais GSM (5 ans offerts)",
+        "resolution": "Sirène 105 dB",
+        "storage": "3 détecteurs IntelliTAG inclus",
+        "pros": "Le plus équilibré : double communication Wi-Fi + GSM, aucun abonnement obligatoire",
+        "cons": "Le relais GSM devient payant (2,99 €/mois) après 5 ans, en option seulement",
+        "search_query": "Somfy Home Alarm Advanced kit",
+    },
+    {
+        "slug": "netatmo-smart-alarm",
+        "name": "Netatmo Smart Alarm System",
+        "price": "≈350 €",
+        "power": "Secteur",
+        "resolution": "Sirène 110 dB + caméra intégrée",
+        "storage": "Stockage vidéo local — jamais d'abonnement requis",
+        "pros": "Le vrai \"zéro frais récurrent\" du comparatif, même pour la vidéo",
+        "cons": "Écosystème plus fermé, moins évolutif que Somfy ou Ajax",
+        "search_query": "Netatmo Smart Alarm System",
+    },
+    {
+        "slug": "ring-alarm-s",
+        "name": "Ring Alarm S",
+        "price": "dès 250 €",
+        "power": "Batterie de secours 24h",
+        "resolution": "Kit évolutif",
+        "storage": "Notifications smartphone incluses",
+        "pros": "Le prix d'entrée le plus bas du comparatif, kit facile à agrandir",
+        "cons": "Contrôle à distance et relais GSM réservés à l'abonnement Ring Protect",
+        "search_query": "Ring Alarm S kit sécurité maison",
+    },
+    {
+        "slug": "ajax-hub-2-plus",
+        "name": "Ajax Hub 2 Plus",
+        "price": "Variable selon config",
+        "power": "Double SIM + Ethernet + Wi-Fi",
+        "resolution": "Jusqu'à 200 appareils compatibles",
+        "storage": "Télésurveillance disponible en option, jamais imposée",
+        "pros": "Le plus \"pro\" et évolutif : idéal pour agrandir le système avec le temps",
+        "cons": "Configuration plus complexe, budget qui grimpe vite selon les accessoires choisis",
+        "search_query": "Ajax Hub 2 Plus alarme maison",
+    },
+]
+
+ARTICLE_INTRO_ALARMS = (
+    "La majorité des alarmes vendues en magasin (Verisure en tête) imposent un abonnement de "
+    "télésurveillance obligatoire, souvent entre 30 € et 50 €/mois — soit 360 € à 600 € par an, "
+    "sans limite dans le temps. Les 4 systèmes ci-dessous fonctionnent très bien avec un "
+    "abonnement optionnel, voire aucun abonnement du tout."
+)
 
 
 # ============================================================
@@ -202,80 +264,123 @@ supplémentaire pour vous. Les avis et comparatifs restent indépendants.</foote
 </main></body></html>"""
 
 
+def _src() -> str:
+    return request.args.get("src", "").strip() or "direct"
+
+
+def _qs(src: str) -> str:
+    return f"?src={quote(src)}" if src and src != "direct" else ""
+
+
 @app.get("/")
 def home():
+    src = _src()
+    qs = _qs(src)
     body = f"""
 <span class="badge">Sécurité domestique connectée</span>
 <h1>Comparatifs de sécurité maison, sans blabla marketing</h1>
 <p class="lede">On compare des produits réels, sur des critères concrets — jamais de note inventée.</p>
 <div class="card">
-<h3><a href="/cameras-exterieures-sans-abonnement">Meilleures caméras extérieures sans abonnement (2026)</a></h3>
+<h3><a href="/cameras-exterieures-sans-abonnement{qs}">Meilleures caméras extérieures sans abonnement (2026)</a></h3>
 <p>4 modèles comparés sur le seul critère qui compte vraiment : est-ce que ça marche encore une fois l'abonnement refusé ?</p>
+</div>
+<div class="card">
+<h3><a href="/alarmes-maison-sans-abonnement{qs}">Meilleures alarmes maison sans abonnement (2026)</a></h3>
+<p>4 systèmes qui fonctionnent sans abonnement obligatoire — et ce que dit vraiment la loi sur les sirènes.</p>
 </div>
 """
     return render_page("NOVAREL SITE — Sécurité domestique", body)
 
 
-@app.get("/cameras-exterieures-sans-abonnement")
-def article_cameras():
+def _render_comparatif(title: str, badge: str, intro: str, products: list, extra_html: str = "") -> str:
+    src = _src()
+    qs = _qs(src)
     cards = ""
-    for cam in CAMERAS:
-        link = f"/go/{cam['slug']}"
+    for p in products:
+        link = f"/go/{p['slug']}{qs}"
         cards += f"""
 <div class="card">
-<h3>{cam['name']}</h3>
-<div class="price">{cam['price']}</div>
+<h3>{p['name']}</h3>
+<div class="price">{p['price']}</div>
 <div class="grid">
-<div><span>Alimentation :</span> {cam['power']}</div>
-<div><span>Résolution :</span> {cam['resolution']}</div>
+<div><span>Alimentation :</span> {p['power']}</div>
+<div><span>Détails :</span> {p['resolution']}</div>
 </div>
-<p><b>Stockage :</b> {cam['storage']}</p>
-<p class="pros">+ {cam['pros']}</p>
-<p class="cons">− {cam['cons']}</p>
+<p><b>Inclus :</b> {p['storage']}</p>
+<p class="pros">+ {p['pros']}</p>
+<p class="cons">− {p['cons']}</p>
 <a class="btn" href="{link}">Voir le prix sur Amazon →</a>
 </div>
 """
-
     rows = "".join(
-        f"<tr><td>{c['name']}</td><td>{c['price']}</td><td>{c['resolution']}</td>"
-        f"<td>{c['power']}</td></tr>"
-        for c in CAMERAS
+        f"<tr><td>{p['name']}</td><td>{p['price']}</td><td>{p['resolution']}</td>"
+        f"<td>{p['power']}</td></tr>"
+        for p in products
     )
+    body = f"""
+<span class="badge">{badge}</span>
+<h1>{title}</h1>
+<p class="lede">{intro}</p>
 
+<table><thead><tr><th>Modèle</th><th>Prix</th><th>Détails</th><th>Alimentation</th></tr></thead>
+<tbody>{rows}</tbody></table>
+
+<h2>Le détail des {len(products)} modèles</h2>
+{cards}
+{extra_html}
+<p class="lede" style="margin-top:24px">Les prix indiqués sont des ordres de grandeur constatés au moment de la rédaction ;
+vérifiez le prix actuel avant achat, il évolue régulièrement.</p>
+"""
+    return body
+
+
+@app.get("/cameras-exterieures-sans-abonnement")
+def article_cameras():
     tips_html = "".join(
         f'<div class="tips"><b>{label}</b>{tip}</div>' for label, tip in PLACEMENT_TIPS
     )
-
-    body = f"""
-<span class="badge">Comparatif 2026</span>
-<h1>Meilleures caméras extérieures sans abonnement</h1>
-<p class="lede">{ARTICLE_INTRO}</p>
-
-<table><thead><tr><th>Modèle</th><th>Prix</th><th>Résolution</th><th>Alimentation</th></tr></thead>
-<tbody>{rows}</tbody></table>
-
-<h2>Le détail des 4 modèles</h2>
-{cards}
+    extra = f"""
 <h2>Est-ce légal d'installer une caméra chez moi ?</h2>
 <p>Oui, mais avec des règles précises fixées par la CNIL : vous ne pouvez filmer que <strong>l'intérieur de votre propriété</strong> (maison, jardin, allée privée). Il est interdit de filmer la voie publique — même pour surveiller votre voiture garée devant chez vous — ainsi que la propriété de vos voisins.</p>
 <p>Si une personne extérieure à la famille entre régulièrement chez vous (nounou, femme de ménage...), vous devez l'informer de la présence de la caméra. En cas de non-respect, un recours est possible auprès de la CNIL, de la police/gendarmerie ou de la justice.</p>
 <h2>Où placer sa caméra pour qu'elle serve vraiment</h2>
 <p>Une caméra mal placée manque les intrusions ou devient inutilisable à cause de l'éblouissement solaire.</p>
 {tips_html}
-
-<p class="lede" style="margin-top:24px">Les prix indiqués sont des ordres de grandeur constatés au moment de la rédaction ;
-vérifiez le prix actuel avant achat, il évolue régulièrement.</p>
 """
+    body = _render_comparatif(
+        "Meilleures caméras extérieures sans abonnement",
+        "Comparatif 2026",
+        ARTICLE_INTRO_CAMERAS,
+        CAMERAS,
+        extra,
+    )
     return render_page("Meilleures caméras extérieures sans abonnement (2026)", body)
+
+
+@app.get("/alarmes-maison-sans-abonnement")
+def article_alarms():
+    extra = """
+<h2>Ce que dit la loi sur les sirènes</h2>
+<p>Contrairement à une idée reçue, il n'existe pas de norme nationale unique en France : ce sont les <strong>préfectures et municipalités</strong> qui fixent les règles précises. La référence la plus utilisée est <strong>105 dB(A) mesurés à 1 mètre, pour une durée maximale de 3 minutes</strong> pour les sirènes extérieures — au-delà, vous risquez un trouble de voisinage, et une plainte reste possible même si l'installation elle-même est légale. Les sirènes intérieures ne sont pas soumises à cette limite de durée, mais doivent respecter un cycle court dans les immeubles collectifs.</p>
+<p><strong>À retenir avant d'installer :</strong> vérifiez que votre sirène est certifiée aux normes en vigueur, et informez vos voisins directs si vous installez une sirène extérieure puissante — ça évite les tensions inutiles.</p>
+"""
+    body = _render_comparatif(
+        "Meilleures alarmes maison sans abonnement",
+        "Comparatif 2026",
+        ARTICLE_INTRO_ALARMS,
+        ALARMS,
+        extra,
+    )
+    return render_page("Meilleures alarmes maison sans abonnement (2026)", body)
 
 
 @app.get("/go/<slug>")
 def go(slug):
-    cam = next((c for c in CAMERAS if c["slug"] == slug), None)
-    if not cam:
+    item = next((c for c in CAMERAS + ALARMS if c["slug"] == slug), None)
+    if not item:
         return "Lien inconnu", 404
-    log_click(slug, cam["name"])
-    return redirect(amazon_search_link(cam["search_query"]), code=302)
+    log_click(slug, item["name"], _src())
+    return redirect(amazon_search_link(item["search_query"]), code=302)
 
 
 @app.get("/health")
@@ -296,9 +401,13 @@ def api_clicks():
         by_product = c.execute(
             "SELECT product, COUNT(*) n FROM clicks GROUP BY product ORDER BY n DESC"
         ).fetchall()
+        by_source = c.execute(
+            "SELECT COALESCE(source,'direct') source, COUNT(*) n FROM clicks GROUP BY source ORDER BY n DESC"
+        ).fetchall()
     return {
         "total": len(rows),
         "by_product": [dict(r) for r in by_product],
+        "by_source": [dict(r) for r in by_source],
         "recent": rows,
     }
 
