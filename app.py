@@ -372,7 +372,7 @@ def init():
             )
 
         defaults = {
-            "running": "0",
+            "running": "1",
             "simulation_only": "1",
             "max_auto_purchase": "0",
             "risk_fraction": "0.10",
