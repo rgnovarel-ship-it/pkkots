@@ -314,10 +314,23 @@ footer{color:#6b7c8d;font-size:13px;margin-top:40px;border-top:1px solid #223046
 """
 
 
-def render_page(title: str, body: str) -> str:
+SITE_URL = "https://novarel-site.onrender.com"
+
+
+def render_page(title: str, body: str, description: str = "", path: str = "/") -> str:
+    desc = description or "Comparatifs indépendants de sécurité domestique : caméras, alarmes, serrures connectées. Prix réels, avis honnêtes, sans abonnement caché."
+    canonical = f"{SITE_URL}{path}"
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{title}</title><style>{BASE_STYLE}</style></head>
+<title>{title}</title>
+<meta name="description" content="{desc}">
+<link rel="canonical" href="{canonical}">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{desc}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="{canonical}">
+<meta name="twitter:card" content="summary">
+<style>{BASE_STYLE}</style></head>
 <body><main>{body}
 <footer>Ce site perçoit une commission sur les achats réalisés via les liens Amazon ci-dessus, sans coût
 supplémentaire pour vous. Les avis et comparatifs restent indépendants.</footer>
@@ -353,7 +366,12 @@ def home():
 <p>4 modèles comparés, et le détail assurance que presque personne ne vérifie avant d'acheter.</p>
 </div>
 """
-    return render_page("NOVAREL SITE — Sécurité domestique", body)
+    return render_page(
+        "Comparatifs sécurité maison sans abonnement — NOVAREL",
+        body,
+        "Caméras, alarmes et serrures connectées comparées sans blabla marketing : prix réels, avis honnêtes, aucune note inventée.",
+        "/",
+    )
 
 
 def _render_comparatif(title: str, badge: str, intro: str, products: list, extra_html: str = "") -> str:
@@ -418,7 +436,12 @@ def article_cameras():
         CAMERAS,
         extra,
     )
-    return render_page("Meilleures caméras extérieures sans abonnement (2026)", body)
+    return render_page(
+        "Meilleures caméras extérieures sans abonnement (2026)",
+        body,
+        "4 caméras extérieures qui fonctionnent vraiment sans abonnement : Reolink, Blink, EufyCam comparées sur prix, autonomie et stockage. Plus la réglementation CNIL à connaître.",
+        "/cameras-exterieures-sans-abonnement",
+    )
 
 
 @app.get("/alarmes-maison-sans-abonnement")
@@ -435,7 +458,12 @@ def article_alarms():
         ALARMS,
         extra,
     )
-    return render_page("Meilleures alarmes maison sans abonnement (2026)", body)
+    return render_page(
+        "Meilleures alarmes maison sans abonnement (2026)",
+        body,
+        "Somfy, Netatmo, Ring, Ajax : 4 alarmes maison sans abonnement obligatoire comparées, plus ce que dit vraiment la loi sur les sirènes en France.",
+        "/alarmes-maison-sans-abonnement",
+    )
 
 
 @app.get("/serrures-connectees-sans-abonnement")
@@ -453,7 +481,12 @@ def article_locks():
         LOCKS,
         extra,
     )
-    return render_page("Meilleures serrures connectées sans abonnement (2026)", body)
+    return render_page(
+        "Meilleures serrures connectées sans abonnement (2026)",
+        body,
+        "Nuki, Yale, Somfy, SwitchBot comparées — et le point assurance (certification A2P) que la plupart des comparatifs ne mentionnent jamais.",
+        "/serrures-connectees-sans-abonnement",
+    )
 
 
 @app.get("/go/<slug>")
@@ -463,6 +496,29 @@ def go(slug):
         return "Lien inconnu", 404
     log_click(slug, item["name"], _src())
     return redirect(amazon_search_link(item["search_query"]), code=302)
+
+
+ARTICLE_PATHS = [
+    "/",
+    "/cameras-exterieures-sans-abonnement",
+    "/alarmes-maison-sans-abonnement",
+    "/serrures-connectees-sans-abonnement",
+]
+
+
+@app.get("/sitemap.xml")
+def sitemap():
+    urls = "".join(
+        f"<url><loc>{SITE_URL}{p}</loc></url>" for p in ARTICLE_PATHS
+    )
+    xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
+    return Response(xml, mimetype="application/xml")
+
+
+@app.get("/robots.txt")
+def robots():
+    txt = f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n"
+    return Response(txt, mimetype="text/plain")
 
 
 @app.get("/health")
