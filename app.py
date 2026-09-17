@@ -2083,7 +2083,7 @@ def api_affiliate_real_data():
         "history": [{"ts": h["ts"], "total_clicks": h["total_clicks"]} for h in history],
     })
 
-def sync_real_affiliate_by_source():
+
     import requests, json
     site_url = os.environ.get("NOVAREL_SITE_URL", "https://novarel-site.onrender.com")
     try:
