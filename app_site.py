@@ -288,6 +288,114 @@ ARTICLE_INTRO_LOCKS = (
 
 
 # ============================================================
+# CONTENU RÉEL — article comparatif détecteurs de fumée (niche #4)
+# ============================================================
+
+SMOKE_DETECTORS = [
+    {
+        "slug": "google-nest-protect",
+        "name": "Google Nest Protect (2ᵉ génération)",
+        "price": "≈120–150 €",
+        "power": "Piles ou secteur (selon modèle)",
+        "resolution": "Détecte fumée ET monoxyde de carbone",
+        "storage": "Alerte vocale + notification smartphone",
+        "pros": "Le seul du comparatif à couvrir fumée + CO dans un seul appareil",
+        "cons": "Prix le plus élevé de la sélection",
+        "search_query": "Google Nest Protect détecteur fumée",
+    },
+    {
+        "slug": "netatmo-detecteur-fumee",
+        "name": "Netatmo Détecteur de Fumée Intelligent",
+        "price": "≈90–110 €",
+        "power": "Pile scellée 10 ans",
+        "resolution": "Notification smartphone même hors domicile",
+        "storage": "Aucune maintenance de pile pendant 10 ans",
+        "pros": "Autonomie record : zéro changement de pile pendant une décennie",
+        "cons": "Détecte uniquement la fumée, pas le CO",
+        "search_query": "Netatmo détecteur de fumée intelligent",
+    },
+    {
+        "slug": "somfy-detecteur-fumee-io",
+        "name": "Somfy Détecteur de Fumée io",
+        "price": "≈65–90 €",
+        "power": "Pile",
+        "resolution": "Intégration à l'écosystème Somfy (alarme, volets)",
+        "storage": "Notification via l'appli Somfy",
+        "pros": "Bon compromis prix/intégration si vous avez déjà du matériel Somfy",
+        "cons": "Moins intéressant en dehors de l'écosystème Somfy",
+        "search_query": "Somfy détecteur de fumée io",
+    },
+    {
+        "slug": "x-sense-sc07-wx",
+        "name": "X-Sense SC07-WX",
+        "price": "≈55–80 €",
+        "power": "Pile",
+        "resolution": "Wi-Fi intégré, notification directe",
+        "storage": "Application dédiée avec historique d'alertes",
+        "pros": "Le meilleur rapport prix/fonctions connectées du comparatif",
+        "cons": "Écosystème moins étendu que Google ou Netatmo",
+        "search_query": "X-Sense SC07-WX détecteur fumée connecté",
+    },
+]
+
+ARTICLE_INTRO_SMOKE = (
+    "Contrairement aux caméras ou aux alarmes, ce n'est pas une option : depuis la loi Morange "
+    "du 8 mars 2015, tout logement en France doit être équipé d'au moins un détecteur de fumée "
+    "conforme à la norme NF EN 14604. Ce n'est pas juste une obligation administrative — en cas "
+    "d'incendie, l'absence de détecteur peut réduire l'indemnisation de votre assurance "
+    "habitation. Autant choisir un modèle qui vous prévient même quand vous n'êtes pas chez vous."
+)
+
+
+# ============================================================
+# CONTENU RÉEL — article comparatif détecteurs de fuite d'eau (niche #5)
+# ============================================================
+
+WATER_LEAK = [
+    {
+        "slug": "switchbot-detecteur-fuite-eau",
+        "name": "SwitchBot Détecteur de fuite d'eau",
+        "price": "≈22 €",
+        "power": "Pile, Wi-Fi direct (pas de hub requis)",
+        "resolution": "IP67, alerte app en cas de fuite",
+        "storage": "Notifications smartphone incluses, aucun abonnement",
+        "pros": "Le meilleur rapport prix/simplicité : installation en 2 minutes, sans hub",
+        "cons": "Un seul capteur par appareil — il en faut plusieurs pour couvrir toute la maison",
+        "search_query": "SwitchBot détecteur de fuite d'eau",
+    },
+    {
+        "slug": "x-sense-sws54",
+        "name": "X-Sense SWS51/54 (kit + station)",
+        "price": "dès 19,99 € l'unité, 59,99 € le kit 3 capteurs + station",
+        "power": "Pile, portée jusqu'à 500 m annoncée",
+        "resolution": "Alarme 100-120 dB, détection dès 0,4 mm d'eau",
+        "storage": "Application dédiée, aucun abonnement",
+        "pros": "Idéal pour une buanderie ou une cave éloignée grâce à sa portée",
+        "cons": "Le kit avec station coûte plus cher que l'unité seule si vous n'avez qu'un point à couvrir",
+        "search_query": "X-Sense SWS54 kit détecteur fuite eau",
+    },
+    {
+        "slug": "us-solid-vanne-motorisee",
+        "name": "U.S. Solid — système avec vanne motorisée",
+        "price": "≈91 $ (≈85 €)",
+        "power": "Secteur/pile selon modèle + vanne à bille motorisée 3/4\"",
+        "resolution": "3 capteurs + alarme sonore",
+        "storage": "Coupe l'eau automatiquement dès qu'une fuite est détectée",
+        "pros": "Le seul qui agit sans vous : il coupe physiquement l'arrivée d'eau, pas juste une alerte",
+        "cons": "Installation plus technique (raccordement sur l'arrivée d'eau), budget plus élevé",
+        "search_query": "U.S. Solid détecteur fuite eau vanne motorisée",
+    },
+]
+
+ARTICLE_INTRO_WATER_LEAK = (
+    "Un dégât des eaux coûte en moyenne plusieurs milliers d'euros de réparations (parquet, "
+    "plâtre, électroménager). Un détecteur à moins de 25 € peut couper l'eau ou vous alerter "
+    "avant que ça ne dégénère. C'est aussi la seule catégorie de ce comparatif où plusieurs "
+    "assureurs offrent une vraie réduction de prime pour en installer."
+)
+
+
+# ============================================================
 # GABARIT HTML
 # ============================================================
 
@@ -365,11 +473,19 @@ def home():
 <h3><a href="/serrures-connectees-sans-abonnement{qs}">Meilleures serrures connectées sans abonnement (2026)</a></h3>
 <p>4 modèles comparés, et le détail assurance que presque personne ne vérifie avant d'acheter.</p>
 </div>
+<div class="card">
+<h3><a href="/detecteurs-fumee-connectes{qs}">Meilleurs détecteurs de fumée connectés (2026)</a></h3>
+<p>Seul produit du site qui est une obligation légale — voici comment bien le choisir.</p>
+</div>
+<div class="card">
+<h3><a href="/detecteurs-fuite-eau-connectes{qs}">Meilleurs détecteurs de fuite d'eau connectés (2026)</a></h3>
+<p>Le détecteur le plus rentable de la maison — et celui qui fait vraiment baisser votre assurance.</p>
+</div>
 """
     return render_page(
         "Comparatifs sécurité maison sans abonnement — NOVAREL",
         body,
-        "Caméras, alarmes et serrures connectées comparées sans blabla marketing : prix réels, avis honnêtes, aucune note inventée.",
+        "Caméras, alarmes, serrures et détecteurs de fumée comparés sans blabla marketing : prix réels, avis honnêtes, aucune note inventée.",
         "/",
     )
 
@@ -489,9 +605,54 @@ def article_locks():
     )
 
 
+@app.get("/detecteurs-fumee-connectes")
+def article_smoke():
+    extra = """
+<h2>Ce n'est pas une option : ce que dit la loi</h2>
+<p>Depuis la <strong>loi Morange du 8 mars 2015</strong> (décret n°2011-36), tout logement en France doit être équipé d'au moins un détecteur autonome avertisseur de fumée (DAAF), conforme à la norme <strong>NF EN 14604</strong> et marqué CE. L'appareil doit émettre une alerte sonore d'au moins 85 dB(A) mesurée à 3 mètres.</p>
+<p>En location, c'est le <strong>propriétaire</strong> qui doit l'installer ; le <strong>locataire</strong> est responsable de son entretien pendant la durée du bail. En cas d'absence de détecteur lors d'un incendie, l'indemnisation de votre assurance habitation peut être réduite — en plus du risque évident pour la sécurité du foyer.</p>
+<p><strong>Ce que la version connectée apporte en plus :</strong> une alerte sur votre téléphone même si vous n'êtes pas chez vous — utile si vous avez un animal, une location saisonnière, ou si vous voulez surveiller une résidence secondaire à distance.</p>
+"""
+    body = _render_comparatif(
+        "Meilleurs détecteurs de fumée connectés",
+        "Obligation légale + comparatif 2026",
+        ARTICLE_INTRO_SMOKE,
+        SMOKE_DETECTORS,
+        extra,
+    )
+    return render_page(
+        "Meilleurs détecteurs de fumée connectés (2026)",
+        body,
+        "Google Nest Protect, Netatmo, Somfy, X-Sense comparés — et l'obligation légale (loi Morange, norme NF EN 14604) que tout logement français doit respecter.",
+        "/detecteurs-fumee-connectes",
+    )
+
+
+@app.get("/detecteurs-fuite-eau-connectes")
+def article_water_leak():
+    extra = """
+<h2>Ce que ça change vraiment : la réduction d'assurance</h2>
+<p>Contrairement aux alarmes anti-intrusion, les détecteurs de fuite d'eau ouvrent droit à de vraies réductions chez plusieurs assureurs français : <strong>MAIF et GMF</strong> jusqu'à 12% via des partenariats avec Netatmo et Somfy, <strong>Allianz</strong> jusqu'à 15% via Homiris, <strong>Cardif</strong> jusqu'à 15% selon un questionnaire sur les équipements déclarés, et <strong>MMA</strong> via leur contrat "Smart Home". Plus largement, la fourchette observée sur le marché est de <strong>10 à 25% de réduction de prime</strong> pour des équipements connectés déclarés et certifiés — vérifiez directement avec votre assureur avant d'acheter en vous basant uniquement sur cet argument.</p>
+<p><strong>À retenir avant d'installer :</strong> placez au moins un capteur sous chaque point à risque (évier, lave-linge, lave-vaisselle, chauffe-eau, WC), pas juste un seul pour toute la maison — c'est la position du capteur, pas le nombre d'appareils, qui détermine si la fuite est repérée à temps.</p>
+"""
+    body = _render_comparatif(
+        "Meilleurs détecteurs de fuite d'eau connectés",
+        "Comparatif 2026",
+        ARTICLE_INTRO_WATER_LEAK,
+        WATER_LEAK,
+        extra,
+    )
+    return render_page(
+        "Meilleurs détecteurs de fuite d'eau connectés (2026)",
+        body,
+        "SwitchBot, X-Sense, U.S. Solid comparés — et les réductions d'assurance habitation (MAIF, Allianz, Cardif) que ce détecteur peut vous faire gagner.",
+        "/detecteurs-fuite-eau-connectes",
+    )
+
+
 @app.get("/go/<slug>")
 def go(slug):
-    item = next((c for c in CAMERAS + ALARMS + LOCKS if c["slug"] == slug), None)
+    item = next((c for c in CAMERAS + ALARMS + LOCKS + SMOKE_DETECTORS + WATER_LEAK if c["slug"] == slug), None)
     if not item:
         return "Lien inconnu", 404
     log_click(slug, item["name"], _src())
@@ -503,6 +664,8 @@ ARTICLE_PATHS = [
     "/cameras-exterieures-sans-abonnement",
     "/alarmes-maison-sans-abonnement",
     "/serrures-connectees-sans-abonnement",
+    "/detecteurs-fumee-connectes",
+    "/detecteurs-fuite-eau-connectes",
 ]
 
 
