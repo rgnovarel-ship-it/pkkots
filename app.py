@@ -1448,92 +1448,26 @@ def reset_simulation():
         ]:
             c.execute(f"DELETE FROM {table}")
 
-     
-def _real_affiliate_migrate():
-    with get_db(write=True) as c:
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS real_affiliate_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ts TEXT,
-                ts_epoch REAL,
-                total_clicks INTEGER,
-                by_product TEXT,
-                by_source TEXT,
-                data_status TEXT DEFAULT 'OBSERVED'
-            )
-        """)
-        cols = [r["name"] for r in c.execute("PRAGMA table_info(real_affiliate_data)").fetchall()]
-        if "by_source" not in cols:
-            c.execute("ALTER TABLE real_affiliate_data ADD COLUMN by_source TEXT")
+        c.execute(
+            """
+            UPDATE strategies SET
+                tests=0, wins=0, losses=0, neutrals=0,
+                profit_sum=0, expected_sum=0, rotation_sum=0,
+                confidence=0.50, weight=1.0, calibration_error=0,
+                last_result=NULL, updated_at=?
+            """,
+            (now_iso(),),
+        )
 
-
-def sync_real_affiliate_data():
-    import requests, json
-    site_url = os.environ.get("NOVAREL_SITE_URL", "https://novarel-site.onrender.com")
-    try:
-        resp = requests.get(site_url + "/api/clicks", timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-    total = data.get("total", 0)
-    by_product = data.get("by_product", [])
-    by_source = data.get("by_source", [])
-
-    try:
-        with get_db(write=True) as c:
-            c.execute(
-                "INSERT INTO real_affiliate_data (ts, ts_epoch, total_clicks, by_product, by_source, data_status) "
-                "VALUES (?, ?, ?, ?, ?, 'OBSERVED')",
-                (datetime.utcnow().isoformat(), time.time(), total, json.dumps(by_product), json.dumps(by_source)),
-            )
-    except Exception as e:
-        return {"error": f"db_write_failed: {e}"}
-
-    return {"total_clicks": total, "by_product": by_product, "by_source": by_source}
-
-
-def _real_affiliate_worker():
-    _real_affiliate_migrate()
-    # Décalage aléatoire au démarrage pour ne jamais tomber pile en même temps
-    # que le cycle principal (qui tourne toutes les 15s).
-    import random as _rnd
-    time.sleep(5 + _rnd.random() * 10)
-    while True:
-        try:
-            sync_real_affiliate_data()
-        except Exception:
-            pass
-        time.sleep(180)
-
-
-threading.Thread(target=_real_affiliate_worker, daemon=True, name="real-affiliate-sync").start()
-
-
-@app.route("/api/affiliate/real-data")
-def api_affiliate_real_data():
-    import json
-    with get_db() as c:
-        row = c.execute("SELECT * FROM real_affiliate_data ORDER BY id DESC LIMIT 1").fetchone()
-        history = c.execute(
-            "SELECT ts, total_clicks FROM real_affiliate_data ORDER BY id DESC LIMIT 20"
-        ).fetchall()
-    if not row:
-        return jsonify({"status": "no_data_yet"})
-    return jsonify({
-        "status": "ok",
-        "data_status": "OBSERVED",
-        "last_sync": row["ts"],
-        "total_clicks": row["total_clicks"],
-        "by_product": json.loads(row["by_product"] or "[]"),
-        "by_source": json.loads(row["by_source"] or "[]"),
-        "history": [{"ts": h["ts"], "total_clicks": h["total_clicks"]} for h in history],
-    })
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5200")), debug=False)
+        c.execute(
+            """
+            UPDATE affiliate_strategies SET
+                tests=0, wins=0, losses=0, neutrals=0,
+                revenue_sum=0, cost_sum=0,
+                confidence=0.50, weight=1.0,
+                last_result=NULL, updated_at=?
+            """,
+            (now_iso(),),
         )
 
         c.execute("DELETE FROM metrics")
@@ -2015,23 +1949,29 @@ init()
 start_worker()
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=False)
+
+
+# ============================================================
+# DONNÉES AFFILIATION RÉELLES (synchronisées depuis NOVAREL SITE)
+# ============================================================
 
 def _real_affiliate_migrate():
-    conn = sqlite3.connect(DB, timeout=30)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS real_affiliate_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts TEXT,
-            ts_epoch REAL,
-            total_clicks INTEGER,
-            by_product TEXT,
-            data_status TEXT DEFAULT 'OBSERVED'
-        )
-    """)
-    conn.commit()
-    conn.close()
+    with get_db(write=True) as c:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS real_affiliate_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT,
+                ts_epoch REAL,
+                total_clicks INTEGER,
+                by_product TEXT,
+                by_source TEXT,
+                data_status TEXT DEFAULT 'OBSERVED'
+            )
+        """)
+        cols = [r["name"] for r in c.execute("PRAGMA table_info(real_affiliate_data)").fetchall()]
+        if "by_source" not in cols:
+            c.execute("ALTER TABLE real_affiliate_data ADD COLUMN by_source TEXT")
+
 
 def sync_real_affiliate_data():
     import requests, json
@@ -2042,36 +1982,49 @@ def sync_real_affiliate_data():
         data = resp.json()
     except Exception as e:
         return {"error": str(e)}
+
     total = data.get("total", 0)
-    by_product = data.get("by_product", {})
-    conn = sqlite3.connect(DB, timeout=30)
-    conn.execute(
-        "INSERT INTO real_affiliate_data (ts, ts_epoch, total_clicks, by_product, data_status) VALUES (?, ?, ?, ?, 'OBSERVED')",
-        (datetime.utcnow().isoformat(), time.time(), total, json.dumps(by_product)),
-    )
-    conn.commit()
-    conn.close()
-    return {"total_clicks": total, "by_product": by_product}
+    by_product = data.get("by_product", [])
+    by_source = data.get("by_source", [])
+
+    try:
+        with get_db(write=True) as c:
+            c.execute(
+                "INSERT INTO real_affiliate_data (ts, ts_epoch, total_clicks, by_product, by_source, data_status) "
+                "VALUES (?, ?, ?, ?, ?, 'OBSERVED')",
+                (datetime.utcnow().isoformat(), time.time(), total, json.dumps(by_product), json.dumps(by_source)),
+            )
+    except Exception as e:
+        return {"error": f"db_write_failed: {e}"}
+
+    return {"total_clicks": total, "by_product": by_product, "by_source": by_source}
+
 
 def _real_affiliate_worker():
     _real_affiliate_migrate()
+    # Décalage aléatoire au démarrage pour ne jamais tomber pile en même temps
+    # que le cycle principal (qui tourne toutes les 15s).
+    import random as _rnd
+    time.sleep(5 + _rnd.random() * 10)
     while True:
         try:
             sync_real_affiliate_data()
         except Exception:
             pass
-        time.sleep(120)
+        time.sleep(180)
+
 
 threading.Thread(target=_real_affiliate_worker, daemon=True, name="real-affiliate-sync").start()
+
 
 @app.route("/api/affiliate/real-data")
 def api_affiliate_real_data():
     import json
-    conn = sqlite3.connect(DB, timeout=30)
-    conn.row_factory = sqlite3.Row
-    row = conn.execute("SELECT * FROM real_affiliate_data ORDER BY id DESC LIMIT 1").fetchone()
-    history = conn.execute("SELECT ts, total_clicks FROM real_affiliate_data ORDER BY id DESC LIMIT 20").fetchall()
-    conn.close()
+    with get_db() as c:
+        row = c.execute("SELECT * FROM real_affiliate_data ORDER BY id DESC LIMIT 1").fetchone()
+        history = c.execute(
+            "SELECT ts, total_clicks FROM real_affiliate_data ORDER BY id DESC LIMIT 20"
+        ).fetchall()
     if not row:
         return jsonify({"status": "no_data_yet"})
     return jsonify({
@@ -2079,55 +2032,17 @@ def api_affiliate_real_data():
         "data_status": "OBSERVED",
         "last_sync": row["ts"],
         "total_clicks": row["total_clicks"],
-        "by_product": json.loads(row["by_product"] or "{}"),
+        "by_product": json.loads(row["by_product"] or "[]"),
+        "by_source": json.loads(row["by_source"] or "[]"),
         "history": [{"ts": h["ts"], "total_clicks": h["total_clicks"]} for h in history],
     })
 
 
-    import requests, json
-    site_url = os.environ.get("NOVAREL_SITE_URL", "https://novarel-site.onrender.com")
-    try:
-        resp = requests.get(site_url + "/api/clicks", timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-    by_source = data.get("by_source", [])
-    conn = sqlite3.connect(DB, timeout=30)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS real_affiliate_by_source (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts TEXT,
-            ts_epoch REAL,
-            by_source TEXT,
-            data_status TEXT DEFAULT 'OBSERVED'
-        )
-    """)
-    conn.execute(
-        "INSERT INTO real_affiliate_by_source (ts, ts_epoch, by_source, data_status) VALUES (?, ?, ?, 'OBSERVED')",
-        (datetime.utcnow().isoformat(), time.time(), json.dumps(by_source)),
-    )
-    conn.commit()
-    conn.close()
-    return {"by_source": by_source}
-
-def _real_affiliate_source_worker():
-    while True:
-        try:
-            sync_real_affiliate_by_source()
-        except Exception:
-            pass
-        time.sleep(120)
-
-threading.Thread(target=_real_affiliate_source_worker, daemon=True, name="real-affiliate-source-sync").start()
-
 @app.route("/api/affiliate/real-data-by-source")
 def api_affiliate_real_data_by_source():
     import json
-    conn = sqlite3.connect(DB, timeout=30)
-    conn.row_factory = sqlite3.Row
-    row = conn.execute("SELECT * FROM real_affiliate_by_source ORDER BY id DESC LIMIT 1").fetchone()
-    conn.close()
+    with get_db() as c:
+        row = c.execute("SELECT * FROM real_affiliate_data ORDER BY id DESC LIMIT 1").fetchone()
     if not row:
         return jsonify({"status": "no_data_yet"})
     return jsonify({
@@ -2136,3 +2051,7 @@ def api_affiliate_real_data_by_source():
         "last_sync": row["ts"],
         "by_source": json.loads(row["by_source"] or "[]"),
     })
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=False)
