@@ -256,7 +256,9 @@ def article_cameras():
 
 <h2>Le détail des 4 modèles</h2>
 {cards}
-
+<h2>Est-ce légal d'installer une caméra chez moi ?</h2>
+<p>Oui, mais avec des règles précises fixées par la CNIL : vous ne pouvez filmer que <strong>l'intérieur de votre propriété</strong> (maison, jardin, allée privée). Il est interdit de filmer la voie publique — même pour surveiller votre voiture garée devant chez vous — ainsi que la propriété de vos voisins.</p>
+<p>Si une personne extérieure à la famille entre régulièrement chez vous (nounou, femme de ménage...), vous devez l'informer de la présence de la caméra. En cas de non-respect, un recours est possible auprès de la CNIL, de la police/gendarmerie ou de la justice.</p>
 <h2>Où placer sa caméra pour qu'elle serve vraiment</h2>
 <p>Une caméra mal placée manque les intrusions ou devient inutilisable à cause de l'éblouissement solaire.</p>
 {tips_html}
