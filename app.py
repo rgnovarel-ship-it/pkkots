@@ -1951,3 +1951,68 @@ start_worker()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=False)
+
+def _real_affiliate_migrate():
+    conn = sqlite3.connect(DB, timeout=30)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS real_affiliate_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT,
+            ts_epoch REAL,
+            total_clicks INTEGER,
+            by_product TEXT,
+            data_status TEXT DEFAULT 'OBSERVED'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def sync_real_affiliate_data():
+    import requests, json
+    site_url = os.environ.get("NOVAREL_SITE_URL", "https://novarel-site.onrender.com")
+    try:
+        resp = requests.get(site_url + "/api/clicks", timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+    total = data.get("total", 0)
+    by_product = data.get("by_product", {})
+    conn = sqlite3.connect(DB, timeout=30)
+    conn.execute(
+        "INSERT INTO real_affiliate_data (ts, ts_epoch, total_clicks, by_product, data_status) VALUES (?, ?, ?, ?, 'OBSERVED')",
+        (datetime.utcnow().isoformat(), time.time(), total, json.dumps(by_product)),
+    )
+    conn.commit()
+    conn.close()
+    return {"total_clicks": total, "by_product": by_product}
+
+def _real_affiliate_worker():
+    _real_affiliate_migrate()
+    while True:
+        try:
+            sync_real_affiliate_data()
+        except Exception:
+            pass
+        time.sleep(120)
+
+threading.Thread(target=_real_affiliate_worker, daemon=True, name="real-affiliate-sync").start()
+
+@app.route("/api/affiliate/real-data")
+def api_affiliate_real_data():
+    import json
+    conn = sqlite3.connect(DB, timeout=30)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM real_affiliate_data ORDER BY id DESC LIMIT 1").fetchone()
+    history = conn.execute("SELECT ts, total_clicks FROM real_affiliate_data ORDER BY id DESC LIMIT 20").fetchall()
+    conn.close()
+    if not row:
+        return jsonify({"status": "no_data_yet"})
+    return jsonify({
+        "status": "ok",
+        "data_status": "OBSERVED",
+        "last_sync": row["ts"],
+        "total_clicks": row["total_clicks"],
+        "by_product": json.loads(row["by_product"] or "{}"),
+        "history": [{"ts": h["ts"], "total_clicks": h["total_clicks"]} for h in history],
+    })
