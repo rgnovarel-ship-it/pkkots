@@ -400,34 +400,72 @@ ARTICLE_INTRO_WATER_LEAK = (
 # ============================================================
 
 BASE_STYLE = """
-*{box-sizing:border-box}body{margin:0;background:#0b0f14;color:#e8edf2;font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-main{max-width:840px;margin:auto;padding:28px 20px}
-h1{font-size:32px;margin:0 0 10px}h2{font-size:22px;margin:32px 0 12px;color:#eaf2f8}
-.lede{color:#9fb0c0;font-size:17px}
+:root{--bg:#0a0d13;--accent:#ff7a18;--accent2:#ffb347;--text:#e8edf5;--muted:#93a4b8;--border:#223046}
+*{box-sizing:border-box}
+body{
+margin:0;color:var(--text);font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;line-height:1.6;
+background:
+  radial-gradient(1200px 600px at 8% -10%,rgba(255,122,24,.10),transparent 60%),
+  radial-gradient(1000px 500px at 92% 0%,rgba(88,166,255,.08),transparent 55%),
+  linear-gradient(180deg,#0a0d13 0%,#0d1220 100%);
+background-attachment:fixed;
+}
+main{max-width:880px;margin:auto;padding:32px 20px 20px}
+h1{font-size:32px;margin:0 0 10px;font-weight:800}
+h2{font-size:22px;margin:32px 0 12px;color:#eaf2f8;font-weight:700}
+.lede{color:var(--muted);font-size:17px}
 a{color:#7ec4ff}
 .badge{display:inline-block;background:#132132;border:1px solid #24425f;border-radius:20px;padding:4px 12px;font-size:12px;color:#8fc4ff;margin-bottom:14px}
-.card{background:#111925;border:1px solid #223046;border-radius:14px;padding:20px;margin:18px 0}
+
+.site-header{position:sticky;top:0;z-index:50;background:rgba(10,13,19,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.header-inner{max-width:880px;margin:auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.4px;color:var(--text);text-decoration:none;font-size:18px}
+.logo-dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 12px rgba(255,122,24,.6)}
+.site-nav{display:flex;gap:18px;flex-wrap:wrap}
+.site-nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;transition:color .15s}
+.site-nav a:hover{color:var(--text)}
+
+.niche-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin:24px 0}
+.niche-card{position:relative;display:block;background:linear-gradient(160deg,rgba(255,255,255,.04),rgba(255,255,255,0)) ,#111925;border:1px solid var(--border);border-radius:16px;padding:22px;text-decoration:none;color:var(--text);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.niche-card:hover{transform:translateY(-4px);border-color:rgba(255,122,24,.5);box-shadow:0 12px 30px rgba(0,0,0,.35),0 0 0 1px rgba(255,122,24,.15)}
+.niche-icon{font-size:32px;display:block;margin-bottom:10px}
+.niche-card h3{margin:0 0 8px;font-size:18px;color:var(--text)}
+.niche-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+
+.card{position:relative;background:linear-gradient(160deg,rgba(255,255,255,.03),rgba(255,255,255,0)),#111925;border:1px solid var(--border);border-radius:14px;padding:20px;margin:18px 0}
 .card h3{margin:0 0 6px;font-size:20px}
+.rank-badge{position:absolute;top:-12px;left:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#1a1005;font-weight:800;font-size:12px;padding:4px 10px;border-radius:20px;box-shadow:0 4px 12px rgba(255,122,24,.35)}
 .price{color:#7bd88f;font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0;font-size:14px}
 .grid div span{color:#7f93a8}
 .pros{color:#7bd88f}.cons{color:#ff9b9b}
-.btn{display:inline-block;margin-top:12px;padding:10px 18px;background:#ff9900;color:#111;font-weight:700;border-radius:8px;text-decoration:none}
+.btn{display:inline-block;margin-top:12px;padding:11px 20px;background:linear-gradient(135deg,#ff7a18,#ffb347);color:#1a1005;font-weight:800;border-radius:8px;text-decoration:none;box-shadow:0 6px 16px rgba(255,122,24,.3);transition:transform .15s ease,box-shadow .15s ease}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(255,122,24,.4)}
 table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
-th,td{text-align:left;padding:9px;border-bottom:1px solid #223046}
+th,td{text-align:left;padding:9px;border-bottom:1px solid var(--border)}
 th{color:#8fa3b7}
 .tips{background:#0f1620;border-left:3px solid #7ec4ff;border-radius:8px;padding:14px 18px;margin:18px 0}
 .tips b{display:block;margin-bottom:2px}
-footer{color:#6b7c8d;font-size:13px;margin-top:40px;border-top:1px solid #223046;padding-top:16px}
+footer{color:#6b7c8d;font-size:13px;margin-top:40px;border-top:1px solid var(--border);padding-top:16px}
 """
 
 
 SITE_URL = "https://novarel-site.onrender.com"
 
+NAV_LINKS = [
+    ("/cameras-exterieures-sans-abonnement", "📷 Caméras"),
+    ("/alarmes-maison-sans-abonnement", "🚨 Alarmes"),
+    ("/serrures-connectees-sans-abonnement", "🔒 Serrures"),
+    ("/detecteurs-fumee-connectes", "🔥 Fumée"),
+    ("/detecteurs-fuite-eau-connectes", "💧 Fuite d'eau"),
+]
+
 
 def render_page(title: str, body: str, description: str = "", path: str = "/") -> str:
     desc = description or "Comparatifs indépendants de sécurité domestique : caméras, alarmes, serrures connectées. Prix réels, avis honnêtes, sans abonnement caché."
     canonical = f"{SITE_URL}{path}"
+    qs = _qs(_src())
+    nav_html = "".join(f'<a href="{href}{qs}">{label}</a>' for href, label in NAV_LINKS)
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title>
@@ -438,8 +476,16 @@ def render_page(title: str, body: str, description: str = "", path: str = "/") -
 <meta property="og:type" content="article">
 <meta property="og:url" content="{canonical}">
 <meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>{BASE_STYLE}</style></head>
-<body><main>{body}
+<body>
+<header class="site-header"><div class="header-inner">
+<a class="logo" href="/{qs}"><span class="logo-dot"></span>NOVAREL</a>
+<nav class="site-nav">{nav_html}</nav>
+</div></header>
+<main>{body}
 <footer>Ce site perçoit une commission sur les achats réalisés via les liens Amazon ci-dessus, sans coût
 supplémentaire pour vous. Les avis et comparatifs restent indépendants.</footer>
 </main></body></html>"""
@@ -461,25 +507,32 @@ def home():
 <span class="badge">Sécurité domestique connectée</span>
 <h1>Comparatifs de sécurité maison, sans blabla marketing</h1>
 <p class="lede">On compare des produits réels, sur des critères concrets — jamais de note inventée.</p>
-<div class="card">
-<h3><a href="/cameras-exterieures-sans-abonnement{qs}">Meilleures caméras extérieures sans abonnement (2026)</a></h3>
+<div class="niche-grid">
+<a class="niche-card" href="/cameras-exterieures-sans-abonnement{qs}">
+<span class="niche-icon">📷</span>
+<h3>Caméras extérieures</h3>
 <p>4 modèles comparés sur le seul critère qui compte vraiment : est-ce que ça marche encore une fois l'abonnement refusé ?</p>
-</div>
-<div class="card">
-<h3><a href="/alarmes-maison-sans-abonnement{qs}">Meilleures alarmes maison sans abonnement (2026)</a></h3>
+</a>
+<a class="niche-card" href="/alarmes-maison-sans-abonnement{qs}">
+<span class="niche-icon">🚨</span>
+<h3>Alarmes maison</h3>
 <p>4 systèmes qui fonctionnent sans abonnement obligatoire — et ce que dit vraiment la loi sur les sirènes.</p>
-</div>
-<div class="card">
-<h3><a href="/serrures-connectees-sans-abonnement{qs}">Meilleures serrures connectées sans abonnement (2026)</a></h3>
+</a>
+<a class="niche-card" href="/serrures-connectees-sans-abonnement{qs}">
+<span class="niche-icon">🔒</span>
+<h3>Serrures connectées</h3>
 <p>4 modèles comparés, et le détail assurance que presque personne ne vérifie avant d'acheter.</p>
-</div>
-<div class="card">
-<h3><a href="/detecteurs-fumee-connectes{qs}">Meilleurs détecteurs de fumée connectés (2026)</a></h3>
+</a>
+<a class="niche-card" href="/detecteurs-fumee-connectes{qs}">
+<span class="niche-icon">🔥</span>
+<h3>Détecteurs de fumée</h3>
 <p>Seul produit du site qui est une obligation légale — voici comment bien le choisir.</p>
-</div>
-<div class="card">
-<h3><a href="/detecteurs-fuite-eau-connectes{qs}">Meilleurs détecteurs de fuite d'eau connectés (2026)</a></h3>
+</a>
+<a class="niche-card" href="/detecteurs-fuite-eau-connectes{qs}">
+<span class="niche-icon">💧</span>
+<h3>Détecteurs de fuite d'eau</h3>
 <p>Le détecteur le plus rentable de la maison — et celui qui fait vraiment baisser votre assurance.</p>
+</a>
 </div>
 """
     return render_page(
@@ -494,10 +547,12 @@ def _render_comparatif(title: str, badge: str, intro: str, products: list, extra
     src = _src()
     qs = _qs(src)
     cards = ""
-    for p in products:
+    for i, p in enumerate(products):
         link = f"/go/{p['slug']}{qs}"
+        rank_badge = f'<span class="rank-badge">#{i + 1}</span>' if i < 3 else ""
         cards += f"""
 <div class="card">
+{rank_badge}
 <h3>{p['name']}</h3>
 <div class="price">{p['price']}</div>
 <div class="grid">
