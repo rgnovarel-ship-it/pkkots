@@ -1,3 +1,4 @@
+
 """
 NOVAREL SITE — le premier vrai site d'affiliation, contenu réel.
 
@@ -25,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from flask import Flask, Response, redirect, request
+from flask import Flask, Response, abort, redirect, request
 
 BASE = Path(__file__).parent
 DB = BASE / "novarel_site.db"
@@ -1089,16 +1090,23 @@ def robots():
     return Response(txt, mimetype="text/plain")
 
 
+# Tokens de vérification Google Search Console valides.
+# IMPORTANT : liste blanche stricte plutôt que réponse générique à
+# n'importe quel token — un serveur qui confirme "vérifié" pour n'importe
+# quelle URL google*.html ressemble à un site compromis aux yeux des
+# contrôles anti-fraude de Google (d'où l'échec "peut-être piraté").
+GOOGLE_VERIFICATION_TOKENS = {
+    "3fde40b5ae1f216b",
+    "87d5a150752fb6d6",
+    "7631f4908729d7f5",
+}
+
+
 @app.get("/google<token>.html")
 def google_site_verification(token):
-    """Fichier de validation Google Search Console.
-
-    Search Console vérifie la propriété du site en demandant un fichier
-    google<token>.html à la racine du domaine. Route générique plutôt que
-    fichier statique (Flask n'expose que /static/, pas la racine), donc
-    n'importe quel token de vérification futur fonctionne sans nouveau
-    déploiement.
-    """
+    """Fichier de validation Google Search Console (liste blanche)."""
+    if token not in GOOGLE_VERIFICATION_TOKENS:
+        abort(404)
     return Response(
         f"google-site-verification: google{token}.html",
         mimetype="text/html",
@@ -1135,12 +1143,6 @@ def api_clicks():
 
 
 init()
-@app.get("/google<token>.html")
-def _google_verify(token):
-    from flask import Response as _R
-    return _R(f"google-site-verification: google{token}.html", mimetype="text/html")
-
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5200")), debug=False)
