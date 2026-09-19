@@ -41,6 +41,11 @@ AMAZON_TAG = os.environ.get("AMAZON_TAG", "TON-TAG-21")  # placeholder tant que 
 # de token ne demande jamais de modifier le code ni de redéployer.
 GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
 
+# Clé d'accès au tableau de bord interne /pulse. Tant qu'elle n'est pas définie
+# en variable d'environnement, la page répond 404 : pas de dashboard exposé par
+# défaut. Se configure via une variable Render nommée PULSE_KEY.
+PULSE_KEY = os.environ.get("PULSE_KEY", "")
+
 SITE_URL = content.SITE_URL
 
 app = Flask(
@@ -458,6 +463,206 @@ def api_clicks():
         "by_source": [dict(r) for r in by_source],
         "recent": rows,
     }
+
+
+# ============================================================
+# PULSE — tableau de bord interne (données réelles uniquement)
+# ============================================================
+#
+# Contrairement à un "centre d'analyse" qui simule des chiffres, cette page
+# n'affiche que ce que le site sait réellement : clics enregistrés, produits
+# au catalogue, statut du tag Amazon, et l'avancement des chantiers en cours.
+# Rien n'est inventé ; un chantier non terminé est marqué comme tel plutôt que
+# masqué.
+
+PULSE_HTML = r"""<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>NOVAREL — Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f4f1ea;--surface:#fbf9f5;--surface-2:#eeeae0;--ink:#10120f;--ink-soft:#33372f;
+  --muted:#64685d;--line:#d9d4c7;--line-strong:#b9b3a3;
+  --signal:#c8f04c;--signal-deep:#9cc021;--alert:#b8331c;--alert-bg:#fbeae6;
+  --good:#1d6642;--good-bg:#e7f2ea;--warn:#8a6410;--warn-bg:#f7efd9;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0c0e0b;--surface:#14170f;--surface-2:#1b1f16;--ink:#f2efe6;--ink-soft:#d5d2c6;
+    --muted:#9aa08f;--line:#292e22;--line-strong:#3b4132;
+    --signal:#c8f04c;--signal-deep:#d8ff66;--alert:#ff8163;--alert-bg:#2a1712;
+    --good:#83dba6;--good-bg:#122319;--warn:#e0b85c;--warn-bg:#241d0d;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:16px/1.5 "Archivo",system-ui,sans-serif;padding-block:env(safe-area-inset-top,0) env(safe-area-inset-bottom,0);}
+main{max-width:1200px;margin:0 auto;padding:32px 20px 64px;}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;
+  flex-wrap:wrap;margin-bottom:28px;}
+h1{font-size:28px;font-weight:800;margin:0;letter-spacing:-0.01em;}
+.sub{color:var(--muted);font-size:14px;margin-top:6px;}
+.mono{font-family:"IBM Plex Mono",monospace;}
+.pulse{display:inline-flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;
+  font-size:13px;color:var(--muted);}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);}
+.dot.bad{background:var(--alert);}
+.dot.live{animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.grid2{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:14px;}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;}
+.card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  margin:0 0 14px;font-weight:600;}
+.stat-label{font-size:13px;color:var(--muted);}
+.stat-value{font-family:"IBM Plex Mono",monospace;font-size:32px;font-weight:600;margin-top:4px;}
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;
+  font-size:13px;font-weight:600;padding:4px 10px;border-radius:6px;margin-top:8px;}
+.badge.good{background:var(--good-bg);color:var(--good);}
+.badge.warn{background:var(--warn-bg);color:var(--warn);}
+.badge.alert{background:var(--alert-bg);color:var(--alert);}
+.bar-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);}
+.bar-row:last-child{border:0;}
+.bar-name{flex:0 0 auto;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:46%;}
+.bar-track{flex:1;height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden;}
+.bar-fill{height:100%;background:var(--signal-deep);border-radius:5px;}
+.bar-n{flex:0 0 auto;font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--muted);
+  min-width:24px;text-align:right;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);}
+th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.05em;}
+td.mono,th.mono{font-family:"IBM Plex Mono",monospace;}
+.empty{color:var(--muted);font-size:14px;padding:8px 0;}
+.chantiers{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;}
+.chantiers li{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);
+  font-size:14px;}
+.chantiers li:last-child{border:0;}
+.state{width:20px;height:20px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:700;}
+.state.done{background:var(--good-bg);color:var(--good);}
+.state.pending{background:var(--warn-bg);color:var(--warn);}
+.state.todo{background:var(--surface-2);color:var(--muted);}
+.foot{margin-top:28px;font-size:12px;color:var(--muted);text-align:center;}
+.err{background:var(--alert-bg);color:var(--alert);border-radius:10px;padding:16px 20px;
+  font-size:14px;margin-bottom:20px;}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1>NOVAREL — Pulse</h1>
+      <div class="sub">Données réelles du site, rien de simulé. Rafraîchi toutes les 20 secondes.</div>
+    </div>
+    <div class="pulse"><span class="dot live" id="dot"></span><span id="asof">—</span></div>
+  </div>
+
+  <div id="err" class="err" hidden></div>
+
+  <div class="grid" id="stats">
+    <div class="card"><div class="stat-label">Clics enregistrés</div><div class="stat-value" id="s-clicks">—</div></div>
+    <div class="card"><div class="stat-label">Produits au catalogue</div><div class="stat-value" id="s-products">—</div></div>
+    <div class="card"><div class="stat-label">Tag Amazon</div><div id="s-tag">—</div></div>
+    <div class="card"><div class="stat-label">Serveur</div><div id="s-status">—</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Clics par produit</h2>
+      <div id="by-product"></div>
+    </div>
+    <div class="card">
+      <h2>Clics par source</h2>
+      <div id="by-source"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Derniers clics</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Horodatage</th><th>Produit</th><th>Source</th></tr></thead>
+        <tbody id="recent"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Chantiers</h2>
+    <ul class="chantiers">
+      <li><span class="state done">✓</span> Tag Amazon Associates configuré</li>
+      <li><span class="state pending">…</span> Mentions légales &amp; politique de confidentialité (en cours)</li>
+      <li><span class="state pending">…</span> Mesure d'audience (Plausible ou GA4, en attente d'un compte)</li>
+      <li><span class="state todo">—</span> Soumission Search Console (manuel, compte Google requis)</li>
+      <li><span class="state pending">…</span> Première épingle Pinterest préparée, publication à faire</li>
+    </ul>
+  </div>
+
+  <div class="foot mono">novarel-site · /pulse · usage interne, non indexé</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+function barRows(items,total,target){
+  if(!items.length){target.innerHTML='<div class="empty">Aucune donnée pour l\'instant.</div>';return;}
+  const max=Math.max(...items.map(i=>i.n),1);
+  target.innerHTML=items.map(i=>`<div class="bar-row">
+    <div class="bar-name">${esc(i.product||i.source||'—')}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${Math.max(4,i.n/max*100)}%"></div></div>
+    <div class="bar-n">${i.n}</div></div>`).join('');
+}
+async function load(){
+  try{
+    const [health,clicks]=await Promise.all([
+      fetch('/health',{cache:'no-store'}).then(r=>r.json()),
+      fetch('/api/clicks',{cache:'no-store'}).then(r=>r.json())
+    ]);
+    $('err').hidden=true;
+    $('dot').className='dot live';
+    $('asof').textContent='Mis à jour '+new Date().toLocaleTimeString('fr-FR');
+    $('s-clicks').textContent=health.total_clicks ?? '—';
+    $('s-products').textContent=health.products ?? '—';
+    $('s-tag').innerHTML=health.amazon_tag_configured
+      ? '<span class="badge good">Configuré</span>'
+      : '<span class="badge alert">Placeholder</span>';
+    $('s-status').innerHTML=health.status==='ok'
+      ? '<span class="badge good">En ligne</span>'
+      : '<span class="badge alert">Problème</span>';
+    barRows(clicks.by_product||[],clicks.total,$('by-product'));
+    barRows(clicks.by_source||[],clicks.total,$('by-source'));
+    const recent=(clicks.recent||[]).slice(0,15);
+    $('recent').innerHTML=recent.length
+      ? recent.map(r=>`<tr><td class="mono">${esc(r.ts)}</td><td>${esc(r.product)}</td><td>${esc(r.source||'direct')}</td></tr>`).join('')
+      : '<tr><td colspan="3" class="empty">Aucun clic enregistré pour l\'instant.</td></tr>';
+  }catch(e){
+    $('dot').className='dot bad';
+    $('err').hidden=false;
+    $('err').textContent='Impossible de charger les données en direct : '+(e.message||e);
+  }
+}
+load();
+setInterval(load,20000);
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/pulse")
+def pulse():
+    if not PULSE_KEY or request.args.get("key") != PULSE_KEY:
+        abort(404)
+    return Response(PULSE_HTML, mimetype="text/html")
 
 
 init()
