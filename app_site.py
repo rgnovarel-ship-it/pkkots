@@ -1135,6 +1135,12 @@ def api_clicks():
 
 
 init()
+@app.get("/google<token>.html")
+def _google_verify(token):
+    from flask import Response as _R
+    return _R(f"google-site-verification: google{token}.html", mimetype="text/html")
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5200")), debug=False)
