@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+# Environnements virtuels locaux
+.venv/
+.venv-*/
+venv/
+
+# Base de suivi des clics : données d'exécution, jamais versionnées
+*.db
+*.db-wal
+*.db-shm

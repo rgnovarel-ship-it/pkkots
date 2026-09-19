@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script type="application/ld+json">{{ jsonld|safe }}</script>
+{% endblock %}
+
+{% block progress %}
+<div class="progress" aria-hidden="true"><div class="progress__bar" data-progress></div></div>
+{% endblock %}
+
+{% block content %}
+<nav class="shell breadcrumb" aria-label="Fil d'Ariane">
+  <ol>
+    <li><a href="/{{ qs }}">Accueil</a></li>
+    <li aria-hidden="true">/</li>
+    <li><span aria-current="page">Méthodologie</span></li>
+  </ol>
+</nav>
+
+<header class="shell article-head">
+  <span class="eyebrow">Transparence</span>
+  <h1 class="article-head__title">Comment nos comparatifs sont fabriqués</h1>
+  <p class="article-head__lede">{{ intro }}</p>
+  <div class="article-meta">
+    <span class="article-meta__item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg>
+      Mis à jour le {{ today }}
+    </span>
+    <span class="article-meta__item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-layers"/></svg>
+      {{ total_products }} produits couverts
+    </span>
+  </div>
+</header>
+
+<div class="shell article-layout">
+  <nav class="toc" aria-label="Sommaire">
+    <div class="toc__title">Sur cette page</div>
+    {%- for section in sections %}
+    <a class="toc__link" href="#{{ section.id }}" data-toc-link>{{ section.heading }}</a>
+    {%- endfor %}
+  </nav>
+
+  <article data-article>
+    {%- for section in sections %}
+    <section class="article-block" id="{{ section.id }}">
+      <span class="eyebrow">{{ "%02d"|format(loop.index) }} — {{ "Limite" if section.flag else "Règle" }}</span>
+      <h2 style="margin-top:0.75rem">{{ section.heading }}</h2>
+      <div class="prose">{{ section.html|safe }}</div>
+      {%- if section.flag %}
+      <div class="callout callout--flag">
+        <div class="callout__title">Pourquoi on l'écrit</div>
+        <p>Un comparatif qui prétend avoir tout testé sans le prouver ne vaut rien. Mieux vaut annoncer
+        la limite que la maquiller : vous savez exactement ce que vous lisez.</p>
+      </div>
+      {%- endif %}
+    </section>
+    {%- endfor %}
+
+    <section class="article-block">
+      <h2>Une question, une correction ?</h2>
+      <div class="prose">
+        <p>Si une information est datée ou inexacte, elle doit être corrigée à la source plutôt que
+        laissée en ligne. Les prix et caractéristiques évoluent : la date de mise à jour en haut de
+        chaque comparatif indique la dernière révision du contenu.</p>
+      </div>
+      <div class="cta-band" style="margin-top:2rem">
+        <div>
+          <h2>Retour aux comparatifs</h2>
+          <p>{{ categories|length }} catégories, {{ total_products }} produits, un seul critère : ce
+          qui fonctionne encore sans abonnement.</p>
+        </div>
+        <a class="btn btn--signal" href="/{{ qs }}">
+          Voir les comparatifs
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+        </a>
+      </div>
+    </section>
+  </article>
+</div>
+{% endblock %}

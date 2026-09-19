@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script type="application/ld+json">{{ jsonld|safe }}</script>
+{% endblock %}
+
+{% block progress %}
+<div class="progress" aria-hidden="true"><div class="progress__bar" data-progress></div></div>
+{% endblock %}
+
+{% block content %}
+<nav class="shell breadcrumb" aria-label="Fil d'Ariane">
+  <ol>
+    <li><a href="/{{ qs }}">Accueil</a></li>
+    <li aria-hidden="true">/</li>
+    <li><span aria-current="page">{{ cat.label }}</span></li>
+  </ol>
+</nav>
+
+<header class="shell article-head">
+  <span class="eyebrow">{{ cat.eyebrow }}</span>
+  <h1 class="article-head__title">{{ cat.h1 }}</h1>
+  <p class="article-head__lede">{{ cat.intro }}</p>
+  <div class="article-meta">
+    <span class="article-meta__item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg>
+      Mis à jour le {{ today }}
+    </span>
+    <span class="article-meta__item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-layers"/></svg>
+      {{ cat.products|length }} modèles comparés
+    </span>
+    <span class="article-meta__item">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info"/></svg>
+      <a href="/methodologie{{ qs }}">Notre méthodologie</a>
+    </span>
+  </div>
+</header>
+
+<div class="shell article-layout">
+  <nav class="toc" aria-label="Sommaire">
+    <div class="toc__title">Sur cette page</div>
+    <a class="toc__link" href="#verdict" data-toc-link>Le verdict en bref</a>
+    <a class="toc__link" href="#comparateur" data-toc-link>Comparateur</a>
+    <a class="toc__link" href="#modeles" data-toc-link>Les {{ cat.products|length }} modèles</a>
+    {%- for section in cat.sections %}
+    <a class="toc__link" href="#{{ section.id }}" data-toc-link>{{ section.heading }}</a>
+    {%- endfor %}
+    <a class="toc__link" href="#faq" data-toc-link>Questions fréquentes</a>
+  </nav>
+
+  <article data-article>
+
+    <section class="article-block" id="verdict" data-buybar-after>
+      <div class="verdict" data-reveal>
+        <div class="verdict__head">
+          <h2>Le verdict en bref</h2>
+          <span>{{ cat.products|length }} modèles retenus</span>
+        </div>
+        <div class="verdict__list">
+          {%- for name, slug, text in cat.verdict %}
+          <div class="verdict__item">
+            <a class="verdict__name" href="#{{ slug }}">
+              {{ name }}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+            </a>
+            <p class="verdict__text">{{ text|safe }}</p>
+          </div>
+          {%- endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="article-block" id="comparateur">
+      <h2>Comparateur</h2>
+      <div class="compare">
+        <div class="compare__hint">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-swipe"/></svg>
+          <span class="compare__hint--wide">Cliquez sur un en-tête de colonne pour trier le tableau</span>
+          <span class="compare__hint--narrow">Toutes les caractéristiques, modèle par modèle</span>
+        </div>
+        <div class="compare__scroll" tabindex="0" role="region" aria-label="Tableau comparatif, défilement horizontal">
+          <table class="compare__table" data-compare>
+            <caption class="visually-hidden">Comparatif des {{ cat.products|length }} modèles : prix, caractéristiques et statut d'abonnement.</caption>
+            <thead>
+              <tr>
+                <th scope="col">
+                  <button class="compare__sort" type="button" data-sort-index="0" data-sort-type="text" aria-sort="none">
+                    Modèle <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sort"/></svg>
+                  </button>
+                </th>
+                <th scope="col">
+                  <button class="compare__sort" type="button" data-sort-index="1" data-sort-type="number" aria-sort="none">
+                    Prix <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sort"/></svg>
+                  </button>
+                </th>
+                <th scope="col" class="is-static">{{ cat.detail_label }}</th>
+                <th scope="col">
+                  <button class="compare__sort" type="button" data-sort-index="3" data-sort-type="text" aria-sort="none">
+                    Alimentation <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sort"/></svg>
+                  </button>
+                </th>
+                <th scope="col" class="is-static">Abonnement</th>
+              </tr>
+            </thead>
+            <tbody>
+              {%- for p in cat.products %}
+              <tr>
+                <td data-label="Modèle"><a class="compare__model" href="#{{ p.slug }}">{{ p.name }}</a></td>
+                <td class="compare__price" data-label="Prix" data-value="{{ p.price_sort }}">{{ p.price }}</td>
+                <td class="compare__muted" data-label="{{ cat.detail_label }}">{{ p.detail }}</td>
+                <td class="compare__muted" data-label="Alimentation">{{ p.power }}</td>
+                <td data-label="Abonnement">
+                  {%- if p.sub %}
+                  <span class="badge badge--{{ p.sub[0] }}">{{ p.sub[1] }}</span>
+                  {%- else %}
+                  <span class="compare__muted">Non précisé</span>
+                  {%- endif %}
+                </td>
+              </tr>
+              {%- endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note-strip">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info"/></svg>
+        <span>« Non précisé » signifie que la fiche produit ne documente pas explicitement ce point —
+        nous préférons l'écrire plutôt que d'affirmer une absence d'abonnement que nous n'avons pas
+        vérifiée.</span>
+      </p>
+    </section>
+
+    <section class="article-block" id="modeles">
+      <h2>Le détail des {{ cat.products|length }} modèles</h2>
+      <div class="products">
+        {%- for p in cat.products %}
+        <article class="product{% if loop.first %} product--top{% endif %}" id="{{ p.slug }}">
+          <div class="product__head">
+            <div class="product__rank">
+              <span>{{ "%02d"|format(loop.index) }}</span>
+              {% if loop.first %}Notre choix{% else %}Alternative{% endif %}
+            </div>
+            <div class="product__title">
+              <h3 class="product__name">{{ p.name }}</h3>
+              <div class="product__price">{{ p.price }}</div>
+            </div>
+            {%- if p.sub %}
+            <div class="product__badges">
+              <span class="badge badge--{{ p.sub[0] }}">{{ p.sub[1] }}</span>
+            </div>
+            {%- endif %}
+          </div>
+
+          <ul class="spec-list">
+            <li class="spec">
+              <div class="spec__label">Alimentation</div>
+              <div class="spec__value">{{ p.power }}</div>
+            </li>
+            <li class="spec">
+              <div class="spec__label">{{ cat.detail_label }}</div>
+              <div class="spec__value">{{ p.detail }}</div>
+            </li>
+            <li class="spec">
+              <div class="spec__label">{{ cat.included_label }}</div>
+              <div class="spec__value">{{ p.included }}</div>
+            </li>
+          </ul>
+
+          <div class="verdict-cols">
+            <div class="vcol vcol--pro">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg>
+              <p><strong>Ce qui convainc</strong>{{ p.pros }}</p>
+            </div>
+            <div class="vcol vcol--con">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-minus"/></svg>
+              <p><strong>Ce qui coince</strong>{{ p.cons }}</p>
+            </div>
+          </div>
+
+          <div class="product__foot">
+            <p class="product__disclosure">Lien affilié Amazon — le prix est identique pour vous.</p>
+            <a class="btn btn--signal" href="/go/{{ p.slug }}{{ qs }}" rel="sponsored nofollow noopener" target="_blank">
+              Voir le prix sur Amazon
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-up-right"/></svg>
+            </a>
+          </div>
+        </article>
+        {%- endfor %}
+      </div>
+
+      <p class="note-strip">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info"/></svg>
+        <span>Les prix indiqués sont des ordres de grandeur constatés au moment de la rédaction ;
+        vérifiez le prix actuel avant achat, il évolue régulièrement.</span>
+      </p>
+    </section>
+
+    {%- for section in cat.sections %}
+    <section class="article-block" id="{{ section.id }}">
+      <h2>{{ section.heading }}</h2>
+      <div class="prose">{{ section.html|safe }}</div>
+      {%- if section.tips %}
+      <ul class="tips">
+        {%- for label, tip in section.tips %}
+        <li class="tip">
+          <div class="tip__label">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pin"/></svg>
+            {{ label }}
+          </div>
+          <p>{{ tip }}</p>
+        </li>
+        {%- endfor %}
+      </ul>
+      {%- endif %}
+      {%- if section.callout %}
+      <div class="callout">
+        <div class="callout__title">{{ section.callout[0] }}</div>
+        <p>{{ section.callout[1] }}</p>
+      </div>
+      {%- endif %}
+    </section>
+    {%- endfor %}
+
+    <section class="article-block" id="faq">
+      <h2>Questions fréquentes</h2>
+      <div class="faq">
+        {%- for question, answer in cat.faq %}
+        <details class="faq__item"{% if loop.first %} open{% endif %}>
+          <summary>{{ question }}</summary>
+          <div class="faq__answer">{{ answer }}</div>
+        </details>
+        {%- endfor %}
+      </div>
+    </section>
+
+    <section class="article-block" id="voir-aussi">
+      <h2>Voir aussi</h2>
+      <div class="related-grid">
+        {%- for rel in related %}
+        <a class="cat-card" href="{{ rel.path }}{{ qs }}">
+          <div class="cat-card__top">
+            <span class="cat-card__icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-{{ rel.icon }}"/></svg>
+            </span>
+          </div>
+          <h3>{{ rel.label }}</h3>
+          <p>{{ rel.short_desc }}</p>
+          <span class="cat-card__foot">
+            {{ rel.products|length }} modèles comparés
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+          </span>
+        </a>
+        {%- endfor %}
+      </div>
+    </section>
+
+  </article>
+</div>
+{% endblock %}
+
+{% block buybar %}
+<div class="buybar" data-buybar data-visible="false">
+  <div class="buybar__info">
+    <div class="buybar__label">Notre choix · {{ top_product.price }}</div>
+    <div class="buybar__name">{{ top_product.name }}</div>
+  </div>
+  <a class="btn btn--signal" href="/go/{{ top_product.slug }}{{ qs }}" rel="sponsored nofollow noopener" target="_blank">
+    Voir le prix
+    <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-up-right"/></svg>
+  </a>
+</div>
+{% endblock %}

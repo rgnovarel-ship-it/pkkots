@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script type="application/ld+json">{{ jsonld|safe }}</script>
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="shell hero__grid">
+    <div>
+      <span class="eyebrow">Sécurité domestique — comparatifs indépendants</span>
+      <h1 class="hero__title">La sécurité maison,<br>sans <mark>abonnement obligatoire.</mark></h1>
+      <p class="hero__lede">
+        {{ total_products }} produits comparés sur un seul angle : ce qui continue de fonctionner le
+        jour où vous refusez de payer tous les mois. Prix réels, limites assumées, aucune note
+        chiffrée inventée.
+      </p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="#comparatifs">
+          Voir les {{ categories|length }} comparatifs
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+        </a>
+        <a class="btn btn--ghost" href="/methodologie{{ qs }}">Comment on travaille</a>
+      </div>
+      <p class="hero__note">Mis à jour le {{ today }} · Liens affiliés Amazon signalés</p>
+    </div>
+
+    <div class="hero__panel" data-reveal>
+      <div class="hero__panel-top">
+        <span>Index des comparatifs</span>
+        <span class="hero__panel-dot" aria-hidden="true"></span>
+      </div>
+      <div class="hero__panel-list">
+        {%- for cat in categories %}
+        <a class="hero__panel-row" href="{{ cat.path }}{{ qs }}">
+          <span>
+            <span class="hero__panel-name">{{ cat.label }}</span>
+            <span class="hero__panel-meta">{{ cat.products|length }} modèles · {{ cat.eyebrow }}</span>
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-up-right"/></svg>
+        </a>
+        {%- endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--flush">
+  <div class="shell">
+    <ul class="stats" data-reveal>
+      {%- for value, label, hint in stats %}
+      <li class="stat">
+        <div class="stat__value">{{ value }}</div>
+        <div class="stat__label">{{ label }}</div>
+        <p class="stat__hint">{{ hint }}</p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="comparatifs">
+  <div class="shell">
+    <div class="section__head">
+      <span class="eyebrow">Les comparatifs</span>
+      <h2>Cinq catégories, une seule question</h2>
+      <p>Est-ce que l'appareil fait encore son travail quand vous ne payez plus rien ? Chaque
+      comparatif répond produit par produit.</p>
+    </div>
+
+    <div class="cat-grid">
+      {%- for cat in categories %}
+      <a class="cat-card" href="{{ cat.path }}{{ qs }}" data-reveal>
+        <div class="cat-card__top">
+          <span class="cat-card__icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-{{ cat.icon }}"/></svg>
+          </span>
+          <span class="cat-card__index">{{ "%02d"|format(loop.index) }} / {{ "%02d"|format(categories|length) }}</span>
+        </div>
+        <h3>{{ cat.label }}</h3>
+        <p>{{ cat.home_desc }}</p>
+        <span class="cat-card__foot">
+          {{ cat.products|length }} modèles comparés
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+        </span>
+      </a>
+      {%- endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="shell">
+    <div class="section__head">
+      <span class="eyebrow">Ce qui change ici</span>
+      <h2>Trois règles qu'on s'impose</h2>
+    </div>
+    <ul class="principles" data-reveal>
+      {%- for title, text in principles %}
+      <li class="principle">
+        <div class="principle__index">{{ "%02d"|format(loop.index) }}</div>
+        <h3>{{ title }}</h3>
+        <p>{{ text }}</p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section">
+  <div class="shell">
+    <div class="legal-band" data-reveal>
+      <span class="eyebrow">Le cadre légal</span>
+      <h2>Trois règles françaises qui changent votre achat</h2>
+      <div class="legal-grid">
+        {%- for tag, title, text, href in legal_items %}
+        <a class="legal-item" href="{{ href }}">
+          <span class="legal-item__tag">{{ tag }}</span>
+          <h3>{{ title }}</h3>
+          <p>{{ text }}</p>
+          <span class="legal-item__more">
+            Lire le détail
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+          </span>
+        </a>
+        {%- endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="shell">
+    <div class="cta-band" data-reveal>
+      <div>
+        <h2>On vous dit aussi ce qu'on ne fait pas</h2>
+        <p>Nous ne testons pas physiquement les produits, et nous l'écrivons. Notre page méthodologie
+        détaille les sources, les critères de classement et notre rémunération.</p>
+      </div>
+      <a class="btn btn--signal" href="/methodologie{{ qs }}">
+        Lire la méthodologie
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}
