@@ -32,6 +32,12 @@ BASE = Path(__file__).parent
 DB = BASE / "novarel_site.db"
 AMAZON_TAG = os.environ.get("AMAZON_TAG", "TON-TAG-21")  # placeholder tant que non configuré
 
+# Balise meta de vérification Google Search Console (méthode "Balise HTML").
+# Se configure via une variable d'environnement Render nommée
+# GOOGLE_SITE_VERIFICATION (juste le code, ex: "abc123..."), pour que changer
+# de token ne demande jamais de modifier le code ni de redéployer.
+GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
+
 app = Flask(__name__)
 
 _DB_WRITE_LOCK = threading.RLock()
@@ -737,8 +743,14 @@ def render_page(
             f'<a class="btn mobile-buybar-btn" href="/go/{sticky_slug}{qs}">Voir le prix →</a>'
             "</div>"
         )
+    google_verify_tag = (
+        f'<meta name="google-site-verification" content="{GOOGLE_SITE_VERIFICATION}">'
+        if GOOGLE_SITE_VERIFICATION
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{google_verify_tag}
 <title>{title}</title>
 <meta name="description" content="{desc}">
 <link rel="canonical" href="{canonical}">
