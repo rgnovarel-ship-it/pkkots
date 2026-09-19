@@ -1089,6 +1089,20 @@ def robots():
     return Response(txt, mimetype="text/plain")
 
 
+@app.get("/google3fde40b5ae1f216b.html")
+def google_site_verification():
+    """Fichier de validation Google Search Console.
+
+    Search Console vérifie la propriété du site en demandant ce fichier à la
+    racine du domaine. Servi par une route plutôt qu'en fichier statique,
+    car Flask expose /static/ et non la racine.
+    """
+    return Response(
+        "google-site-verification: google3fde40b5ae1f216b.html",
+        mimetype="text/html",
+    )
+
+
 @app.get("/health")
 def health():
     with get_db() as c:
