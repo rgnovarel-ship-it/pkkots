@@ -1,15 +1,16 @@
 import React from "react";
-import { useCurrentFrame } from "remotion";
+import { interpolate, useCurrentFrame } from "remotion";
 import { alpha, COLORS, LAYOUT } from "../../brand";
 import { FONT_MONO, FONT_SANS } from "../../fonts";
 import { DESCRIPTION, EYEBROW, HEADLINE } from "../content";
-import { revealOut } from "../motion";
+import { revealOut, siteEase } from "../motion";
 import { Y } from "../positions";
 import { T } from "../timing";
 
 /**
  * Rangs de sortie : la cascade repart du bas, le bas s'en va en premier.
- * (Le logo, lui, ne sort jamais — il tient la dernière frame.)
+ * (Le bandeau, le sur-titre et le logo ne sortent jamais — ils tiennent la
+ * première et la dernière frame.)
  */
 export const EXIT_RANK = {
   signature: 0,
@@ -19,17 +20,47 @@ export const EXIT_RANK = {
   headline3: 6,
   headline2: 7,
   headline1: 8,
-  eyebrow: 9,
 } as const;
 
-/** Bloc de texte qui entre par le bas et ressort par le haut. */
+/**
+ * Révélation au masque : le texte glisse derrière un cadre qui le coupe net,
+ * il ne « s'allume » pas en fondu. C'est le geste d'affiche imprimée, et c'est
+ * ce qui distingue une animation soignée d'un fondu générique.
+ */
+const MaskLine: React.FC<{
+  from: number;
+  rank: number;
+  top: number;
+  height: number;
+  children: React.ReactNode;
+}> = ({ from, rank, top, height, children }) => {
+  const frame = useCurrentFrame();
+  const { enter, leave } = revealOut(frame, from, rank);
+  const y = (1 - enter) * height - leave * height;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: LAYOUT.gutter,
+        width: LAYOUT.contentWidth,
+        top,
+        height,
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ transform: `translateY(${y}px)` }}>{children}</div>
+    </div>
+  );
+};
+
+/** Bloc qui arrive en fondu et translation — pour ce qui n'est pas le titre. */
 export const Line: React.FC<{
   from: number;
   rank: number;
   top: number;
   children: React.ReactNode;
-  style?: React.CSSProperties;
-}> = ({ from, rank, top, children, style }) => {
+}> = ({ from, rank, top, children }) => {
   const frame = useCurrentFrame();
   const { enter, leave } = revealOut(frame, from, rank);
 
@@ -41,8 +72,7 @@ export const Line: React.FC<{
         width: LAYOUT.contentWidth,
         top,
         opacity: enter * (1 - leave),
-        transform: `translateY(${(1 - enter) * 26 - leave * 22}px)`,
-        ...style,
+        transform: `translateY(${(1 - enter) * 24 - leave * 20}px)`,
       }}
     >
       {children}
@@ -50,78 +80,99 @@ export const Line: React.FC<{
   );
 };
 
-/** Sur-titre : le `.eyebrow` du site, carré signal compris. */
+/** Sur-titre : le `.eyebrow` du site, carré signal compris. Permanent. */
 export const Eyebrow: React.FC = () => (
-  <Line from={T.eyebrow} rank={EXIT_RANK.eyebrow} top={Y.eyebrow}>
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 12,
-        fontFamily: FONT_MONO,
-        fontWeight: 600,
-        fontSize: 19,
-        letterSpacing: 2.6,
-        color: COLORS.muted,
-      }}
-    >
-      <span style={{ width: 10, height: 10, background: COLORS.signal }} />
-      {EYEBROW}
-    </span>
-  </Line>
+  <div
+    style={{
+      position: "absolute",
+      left: LAYOUT.gutter,
+      top: Y.eyebrow,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 12,
+      fontFamily: FONT_MONO,
+      fontWeight: 600,
+      fontSize: 19,
+      letterSpacing: 2.6,
+      color: COLORS.muted,
+    }}
+  >
+    <span style={{ width: 10, height: 10, background: COLORS.signal }} />
+    {EYEBROW}
+  </div>
 );
 
 const titleStyle: React.CSSProperties = {
   fontFamily: FONT_SANS,
   fontWeight: 800,
-  fontSize: 70,
-  lineHeight: 1.02,
-  letterSpacing: -1.8,
+  fontSize: 76,
+  lineHeight: 1,
+  letterSpacing: -2,
   color: COLORS.ink,
   margin: 0,
 };
 
 export const HeadlineOne: React.FC = () => (
-  <Line from={T.headline1} rank={EXIT_RANK.headline1} top={Y.headline}>
-    <div style={titleStyle}>{HEADLINE.line1}</div>
-  </Line>
+  <MaskLine from={T.headline1} rank={EXIT_RANK.headline1} top={Y.headline} height={92}>
+    <div style={{ ...titleStyle, paddingTop: 8 }}>{HEADLINE.line1}</div>
+  </MaskLine>
 );
 
-/** Le `<mark>` du site : fond signal, encre dessus. */
-export const HeadlineMark: React.FC = () => (
-  <Line from={T.headline2} rank={EXIT_RANK.headline2} top={Y.headline + 78}>
-    <div style={titleStyle}>
-      <span
-        style={{
-          display: "inline-block",
-          background: COLORS.signal,
-          color: COLORS.ink,
-          padding: "4px 14px 10px",
-          boxShadow: `0 10px 26px -18px ${alpha(COLORS.inkSoft, 0.9)}`,
-        }}
-      >
-        {HEADLINE.mark}
-      </span>
-    </div>
-  </Line>
-);
+/**
+ * La ligne surlignée : le `<mark>` du site. Le bloc signal se déroule d'abord
+ * depuis la gauche, le mot monte ensuite derrière le masque. Deux temps.
+ */
+export const HeadlineMark: React.FC = () => {
+  const frame = useCurrentFrame();
+  const wipe = interpolate(frame, [T.headline2, T.headline2 + T.enter], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: siteEase,
+  });
+
+  return (
+    <MaskLine
+      from={T.headline2 + 6}
+      rank={EXIT_RANK.headline2}
+      top={Y.headline + 96}
+      height={104}
+    >
+      <div style={{ ...titleStyle, position: "relative", paddingTop: 10 }}>
+        <span style={{ position: "relative", display: "inline-block" }}>
+          <span
+            style={{
+              position: "absolute",
+              inset: "-8px -14px -14px -14px",
+              background: COLORS.signal,
+              transform: `scaleX(${wipe})`,
+              transformOrigin: "left center",
+              boxShadow: `0 12px 30px -22px ${alpha(COLORS.inkSoft, 0.9)}`,
+            }}
+          />
+          <span style={{ position: "relative" }}>{HEADLINE.mark}</span>
+        </span>
+      </div>
+    </MaskLine>
+  );
+};
 
 /** La chute, plus basse en hiérarchie : c'est une remarque, pas un cri. */
 export const HeadlineTurn: React.FC = () => (
-  <Line from={T.headline3} rank={EXIT_RANK.headline3} top={Y.headline + 176}>
+  <MaskLine from={T.headline3} rank={EXIT_RANK.headline3} top={Y.headline + 206} height={64}>
     <div
       style={{
         fontFamily: FONT_SANS,
         fontWeight: 600,
         fontSize: 42,
-        lineHeight: 1.1,
+        lineHeight: 1.12,
         letterSpacing: -0.8,
         color: COLORS.inkSoft,
+        paddingTop: 4,
       }}
     >
       {HEADLINE.line3}
     </div>
-  </Line>
+  </MaskLine>
 );
 
 export const Description: React.FC = () => (

@@ -6,7 +6,7 @@ Deux compositions :
 
 | id | ce que c'est | sortie |
 |---|---|---|
-| **`PubNovarel`** | version courante — pub en lumière naturelle, monde clair du site | `out/pub-novarel.mp4` (7,5 s) |
+| **`PubNovarel`** | version courante — bandeau des mois + titre au masque, monde clair du site | `out/pub-novarel.mp4` (7,5 s) |
 | `PinNovarel` | première version, gardée en archive — scène de nuit | `out/pin-novarel.mp4` (6,5 s) |
 
 Format commun : 1000 × 1500 (2:3 Pinterest), 30 fps, MP4 / H.264 / yuv420p,
@@ -45,36 +45,48 @@ REMOTION_BROWSER_EXECUTABLE=/chemin/vers/headless_shell npm run build:pub
 | Minutage, durée totale, ordre des arrivées et des sorties | `src/pub/timing.ts` |
 | Position verticale des blocs | `src/pub/positions.ts` |
 | Couleurs et easing de marque (partagés) | `src/brand.ts` |
-| Mur, soleil, ombre de fenêtre, rai, poussière | `src/pub/parts/Wall.tsx` |
-| La caméra (platine, bras, visière, objectif, voyant) | `src/pub/parts/Camera.tsx` |
+| Fond papier, chaleur, balayage brillant | `src/pub/parts/Paper.tsx` |
+| Le bandeau des mois (hauteur, vitesse, largeur des cellules) | `src/pub/parts/Ticker.tsx` |
+| Le titre, sa révélation au masque, le bloc signal | `src/pub/parts/Copy.tsx` |
 | Le panneau comparatif | `src/pub/parts/Panel.tsx` |
 | Intensité du grain | `src/pub/parts/Grain.tsx` |
 
-## Comment la lumière est construite
+## Le parti pris visuel
 
-Une seule source : un soleil bas, hors champ en haut à droite (`SUN` dans
-`Wall.tsx`). Tout en découle.
+Aucun objet dessiné. Le visuel principal est un **bandeau d'encre où les douze
+mois défilent sans jamais s'arrêter** — c'est ça, « tous les mois » — et le
+titre répond juste en dessous. Un faux objet en volume est le marqueur numéro un
+d'un visuel généré : il n'y en a plus.
 
-- Le mur reçoit une nappe chaude côté source et une zone froide en bas à gauche.
-- Une ombre de fenêtre, très floue, glisse lentement en haut du cadre.
-- Un rai de lumière traverse la scène en diagonale ; de la poussière y dérive.
-- La caméra est éclairée en haut et à droite, ses flancs bas-gauche sont dans
-  l'ombre, et elle projette une ombre penchée vers le bas à gauche — dense au
-  contact de la platine, de plus en plus floue en s'éloignant.
-- La visière porte une ombre sur le corps : c'est ce qui les désolidarise.
-- Grain en deux passes : `multiply` mord dans les ombres, `overlay` réveille les
-  hautes lumières.
+La lumière est une lumière d'imprimé, pas une lumière de scène 3D :
+
+- une chaleur qui respire dans l'angle haut droit, une retombée plus froide en
+  bas à gauche ;
+- un **balayage brillant** très large et très doux qui traverse la page une fois
+  par boucle, comme la lumière qui glisse sur une dorure (`Paper.tsx`) ;
+- un grain en deux passes : `multiply` mord dans les ombres, `overlay` réveille
+  les hautes lumières ;
+- un micro-travelling permanent, parce qu'une image parfaitement fixe trahit le
+  rendu.
+
+Le titre se révèle **au masque** : chaque ligne glisse derrière un cadre qui la
+coupe net, elle ne s'allume pas en fondu. La ligne surlignée se fait en deux
+temps — le bloc signal se déroule depuis la gauche, puis le mot monte derrière
+son masque.
 
 ## La boucle
 
-Le décor, la caméra et le logo sont présents du début à la fin, et **toute leur
-animation est périodique sur la durée totale** (`loopWave()` dans `motion.ts`,
-un sinus de période `DURATION`). Le voyant clignote sur 45 frames, soit 5 cycles
-exacts sur 225. Seuls les textes entrent puis ressortent, en cascade inverse.
+Le bandeau, le sur-titre et le logo sont présents du début à la fin, et **toute
+leur animation est périodique sur la durée totale**. Le défilement des mois est
+exact : chaque cellule fait une largeur fixe (`CELL` dans `Ticker.tsx`), le
+motif se répète donc tous les 12 × CELL pixels, et on translate d'un cycle
+entier sur `DURATION` — le raccord est mathématiquement invisible. Le balayage
+brillant et le micro-travelling suivent la même règle (`loopWave()` dans
+`motion.ts`).
 
-Conséquence : la dernière frame est identique à la première — plan produit +
-logo sur le mur éclairé — donc la boucle ne coupe pas, et aucune frame n'est
-noire.
+Seuls les textes entrent puis ressortent, en cascade inverse. Conséquence : la
+dernière frame est identique à la première — bandeau, sur-titre et logo — donc
+la boucle ne coupe pas, et aucune frame n'est noire ni vide.
 
 **Couverture Pinterest :** la première frame ne porte pas encore le message.
 Choisis l'image de couverture au moment de l'upload, ou utilise
@@ -102,8 +114,7 @@ droite), le `.badge`, le `.btn--signal`, le `.brand`.
 
 - Aucun chiffre, aucune note, aucun avis, aucun classement inventé. Les prix
   sont les fourchettes fournies, recopiées telles quelles dans `content.ts`.
-- Aucune image ni vidéo téléchargée : la caméra est dessinée en SVG, la lumière
-  et le grain sont générés.
-- Tout le mouvement dérive de `useCurrentFrame()`. La poussière utilise un
-  générateur à seed fixe (`seeded()`), jamais `Math.random()` au rendu : sans
-  ça, l'image scintillerait d'une frame à l'autre.
+- Aucune image ni vidéo téléchargée : tout est typographie, aplats et filets.
+- Les douze mois sont les douze mois de l'année, rien d'autre à y lire : ni
+  montant, ni durée d'engagement, ni promesse.
+- Tout le mouvement dérive de `useCurrentFrame()`, avec l'easing du site.

@@ -15,15 +15,15 @@ const s = (seconds: number) => Math.round(seconds * FPS);
 
 export const T = {
   /** Arrivées. Le titre est à l'écran avant 1,2 s. */
-  eyebrow: s(0.4),
-  headline1: s(0.6),
-  headline2: s(0.8),
-  headline3: s(1.1),
-  description: s(1.5),
-  panel: s(1.9),
+  eyebrow: s(0),
+  headline1: s(0.35),
+  headline2: s(0.6),
+  headline3: s(0.95),
+  description: s(1.35),
+  panel: s(1.75),
   panelStagger: s(0.22),
-  cta: s(2.9),
-  signature: s(3.2),
+  cta: s(2.8),
+  signature: s(3.1),
 
   /** Durée d'une arrivée et d'une sortie. */
   enter: s(0.55),

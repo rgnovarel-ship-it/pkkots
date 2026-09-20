@@ -5,6 +5,22 @@
 
 export const EYEBROW = "COMPARATIF CAMÉRAS · 2026";
 
+/** Les douze mois : c'est le bandeau qui défile, rien d'autre à y lire. */
+export const MONTHS = [
+  "JANVIER",
+  "FÉVRIER",
+  "MARS",
+  "AVRIL",
+  "MAI",
+  "JUIN",
+  "JUILLET",
+  "AOÛT",
+  "SEPTEMBRE",
+  "OCTOBRE",
+  "NOVEMBRE",
+  "DÉCEMBRE",
+] as const;
+
 /** Titre en trois temps : le constat, le mot surligné, la chute. */
 export const HEADLINE = {
   line1: "Vous payez déjà",
