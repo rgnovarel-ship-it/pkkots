@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# On ignore le dossier de sortie, sauf le livrable lui-même.
+out/*
+!out/pin-novarel.mp4
