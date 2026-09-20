@@ -6,3 +6,5 @@ dist
 # On ignore le dossier de sortie, sauf le livrable lui-même.
 out/*
 !out/pin-novarel.mp4
+!out/pub-novarel.mp4
+!out/pub-novarel-cover.png
