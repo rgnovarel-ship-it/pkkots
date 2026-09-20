@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #f4f1ea;
+        --surface: #fbf9f5;
+        --ink: #10120f;
+        --ink-soft: #33372f;
+        --muted: #64685d;
+        --line: #d9d4c7;
+        --line-strong: #b9b3a3;
+        --signal: #c8f04c;
+        --signal-deep: #9cc021;
+        --alert: #b8331c;
+        --night: #0c0e0b;
+        --night-ink: #f2efe6;
+        --night-muted: #9aa08f;
+        --night-line: #292e22;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      body { background: #555; font-family: "Archivo", sans-serif; }
+
+      .pin {
+        width: 1000px; height: 1500px;
+        position: relative; overflow: hidden;
+        display: flex; flex-direction: column;
+        padding: 72px 68px;
+      }
+
+      /* La trame millimétrée du site. */
+      .pin::before {
+        content: ""; position: absolute; inset: 0;
+        background-size: 100px 100px;
+        pointer-events: none;
+      }
+      .pin--night { background: var(--night); color: var(--night-ink); }
+      .pin--night::before {
+        background-image:
+          linear-gradient(to right, var(--night-line) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--night-line) 1px, transparent 1px);
+        opacity: 0.6;
+      }
+      .pin--paper { background: var(--paper); color: var(--ink); }
+      .pin--paper::before {
+        background-image:
+          linear-gradient(to right, var(--line) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+        opacity: 0.75;
+      }
+
+      .lay { position: relative; display: flex; flex-direction: column; height: 100%; }
+
+      /* --- Bandeau de marque --- */
+      .brand { display: flex; align-items: center; gap: 16px; }
+      .brand svg { width: 40px; height: 40px; }
+      .brand .name { font-size: 32px; font-weight: 800; letter-spacing: 0.02em; }
+      .brand .suffix {
+        font-family: "IBM Plex Mono", monospace; font-size: 15px; font-weight: 500;
+        letter-spacing: 0.14em; text-transform: uppercase;
+        padding-left: 16px;
+      }
+      .pin--night .brand .suffix { color: var(--night-muted); border-left: 1px solid var(--night-line); }
+      .pin--paper .brand .suffix { color: var(--muted); border-left: 1px solid var(--line-strong); }
+
+      /* --- Titre --- */
+      h1 { font-weight: 800; line-height: 0.96; letter-spacing: -0.035em; }
+      .t-xl { font-size: 118px; }
+      .t-lg { font-size: 86px; }
+
+      .sub { font-size: 28px; line-height: 1.45; max-width: 24ch; }
+      .pin--night .sub { color: var(--night-muted); }
+      .pin--paper .sub { color: var(--muted); }
+
+      .eyebrow {
+        display: flex; align-items: center; gap: 16px;
+        font-family: "IBM Plex Mono", monospace; font-size: 16px; font-weight: 500;
+        letter-spacing: 0.18em; text-transform: uppercase;
+      }
+      .eyebrow::before { content: ""; width: 44px; height: 1px; }
+      .pin--night .eyebrow { color: var(--night-muted); }
+      .pin--night .eyebrow::before { background: var(--night-line); }
+      .pin--paper .eyebrow { color: var(--muted); }
+      .pin--paper .eyebrow::before { background: var(--line-strong); }
+
+      .spacer { flex: 1; }
+
+      /* --- Avertissement --- */
+      .warn {
+        background: var(--surface); color: var(--ink);
+        border: 1px solid var(--line); border-left: 5px solid var(--alert);
+        padding: 40px 44px;
+        display: flex; gap: 28px;
+      }
+      .warn .mark {
+        width: 54px; height: 54px; flex-shrink: 0;
+        background: var(--signal);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .warn .mark svg { width: 30px; height: 30px; }
+      .warn .label {
+        font-family: "IBM Plex Mono", monospace; font-size: 16px; font-weight: 600;
+        letter-spacing: 0.16em; text-transform: uppercase; color: var(--alert);
+      }
+      .warn p { margin-top: 18px; font-size: 25px; line-height: 1.45; color: var(--ink-soft); }
+      .warn p + p { margin-top: 16px; }
+
+      /* --- Pied : le choix + l'adresse --- */
+      .pick { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 10px;
+        background: var(--signal); color: var(--ink);
+        font-family: "IBM Plex Mono", monospace; font-size: 16px; font-weight: 600;
+        letter-spacing: 0.12em; text-transform: uppercase;
+        padding: 11px 16px;
+      }
+      .pick .name { margin-top: 20px; font-size: 40px; font-weight: 700; letter-spacing: -0.02em; }
+      .pick .price { margin-top: 10px; font-family: "IBM Plex Mono", monospace; font-size: 26px; font-weight: 600; }
+      .pick .note {
+        margin-top: 6px; font-family: "IBM Plex Mono", monospace; font-size: 14px;
+        font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+      }
+      .pin--night .pick .note { color: var(--night-muted); }
+      .pin--paper .pick .note { color: var(--muted); }
+
+      .url {
+        font-family: "IBM Plex Mono", monospace; font-size: 19px; font-weight: 500;
+        letter-spacing: 0.04em; padding-bottom: 8px;
+        border-bottom: 2px solid var(--signal);
+        white-space: nowrap;
+      }
+
+      /* --- Le comparatif en trois lignes --- */
+      .list { border-top: 1px solid var(--night-line); }
+      .item {
+        display: flex; align-items: flex-end; justify-content: space-between; gap: 28px;
+        padding: 24px 0 24px;
+        border-bottom: 1px solid var(--night-line);
+      }
+      .item--best { padding-top: 22px; border-top: 2px solid var(--signal-deep); margin-top: -1px; }
+      .item-name { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+      .item--best .item-name { margin-top: 16px; }
+      .item-price {
+        font-family: "IBM Plex Mono", monospace; font-size: 26px; font-weight: 600;
+        white-space: nowrap;
+      }
+      .pin--night .item:not(.item--best) .item-name,
+      .pin--night .item:not(.item--best) .item-price { color: var(--night-muted); }
+
+      .pin--paper .list { border-top-color: var(--line); }
+      .pin--paper .item { border-bottom-color: var(--line); }
+      .pin--paper .item:not(.item--best) .item-name,
+      .pin--paper .item:not(.item--best) .item-price { color: var(--muted); }
+
+      .rule { height: 1px; }
+      .pin--night .rule { background: var(--night-line); }
+      .pin--paper .rule { background: var(--line); }
+    </style>
+  </head>
+  <body>
+    <!-- ============ PIN A — la promesse ============ -->
+    <div class="pin pin--night" id="pin-a">
+      <div class="lay">
+        <div class="brand">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3.5 20V4l17 16V4" stroke="#f2efe6" stroke-width="2.4" stroke-linecap="square" />
+          </svg>
+          <span class="name">NOVAREL</span>
+          <span class="suffix">Sans abonnement</span>
+        </div>
+
+        <div style="margin-top: 74px">
+          <div class="eyebrow">Sécurité domestique</div>
+          <h1 class="t-xl" style="margin-top: 32px">Payez-la<br />une fois.<br />Pas tous<br />les mois.</h1>
+        </div>
+
+        <p class="sub" style="margin-top: 44px">
+          Prix juste, qualité durable, payée une seule fois — même en plusieurs fois.
+          Pas de rançon mensuelle pour garder l'accès à VOS images.
+        </p>
+
+        <div class="spacer"></div>
+
+        <!-- Le comparatif en trois lignes : la substance de la marque. -->
+        <div class="eyebrow" style="margin-bottom: 26px">Caméras extérieures sans abonnement</div>
+        <div class="list">
+          <div class="item item--best">
+            <div>
+              <span class="chip">
+                <svg viewBox="0 0 12 12" width="13" height="13" fill="none">
+                  <path d="M2 6.4 4.8 9 10 3.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                Meilleur choix
+              </span>
+              <div class="item-name">Reolink Argus 4 Pro</div>
+            </div>
+            <div class="item-price">≈ 150–180 €</div>
+          </div>
+          <div class="item">
+            <div class="item-name">Reolink RLC-810A</div>
+            <div class="item-price">≈ 90–120 €</div>
+          </div>
+          <div class="item">
+            <div class="item-name">Blink Outdoor 4</div>
+            <div class="item-price">≈ 100 €</div>
+          </div>
+        </div>
+
+        <div class="pick" style="margin-top: 40px">
+          <div class="note">Prix constatés — payés une fois</div>
+          <div class="url">novarel-site.onrender.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PIN B — l'avertissement ============ -->
+    <div class="pin pin--paper" id="pin-b">
+      <div class="lay">
+        <div class="brand">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3.5 20V4l17 16V4" stroke="#10120f" stroke-width="2.4" stroke-linecap="square" />
+          </svg>
+          <span class="name">NOVAREL</span>
+          <span class="suffix">Sans abonnement</span>
+        </div>
+
+        <div style="margin-top: 74px">
+          <div class="eyebrow">Avant d'acheter une caméra</div>
+          <h1 class="t-lg" style="margin-top: 32px">
+            L'appareil est<br />payé. Les images,<br />pas toujours.
+          </h1>
+        </div>
+
+        <div class="warn" style="margin-top: 64px">
+          <span class="mark">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 4.5 2.8 20h18.4L12 4.5Z" stroke="#10120f" stroke-width="1.8" stroke-linejoin="round" />
+              <path d="M12 10v4.2" stroke="#10120f" stroke-width="1.8" stroke-linecap="round" />
+              <circle cx="12" cy="17.2" r="1" fill="#10120f" />
+            </svg>
+          </span>
+          <div>
+            <div class="label">Ce qu'on ne vous dit pas toujours</div>
+            <p>
+              La plupart des caméras « gratuites » ou « à petit prix » facturent un
+              abonnement mensuel pour accéder à l'enregistrement cloud de VOS propres
+              images.
+            </p>
+            <p>
+              Vérifiez toujours si le stockage local (carte SD, disque local) est
+              possible AVANT d'acheter.
+            </p>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <!-- La conclusion utile : celles qui passent le test. -->
+        <div class="eyebrow" style="margin-bottom: 26px">Sans abonnement obligatoire</div>
+        <div class="list">
+          <div class="item item--best">
+            <div>
+              <span class="chip">
+                <svg viewBox="0 0 12 12" width="13" height="13" fill="none">
+                  <path d="M2 6.4 4.8 9 10 3.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                Meilleur choix
+              </span>
+              <div class="item-name">Reolink Argus 4 Pro</div>
+            </div>
+            <div class="item-price">≈ 150–180 €</div>
+          </div>
+          <div class="item">
+            <div class="item-name">Reolink RLC-810A</div>
+            <div class="item-price">≈ 90–120 €</div>
+          </div>
+          <div class="item">
+            <div class="item-name">Blink Outdoor 4</div>
+            <div class="item-price">≈ 100 €</div>
+          </div>
+        </div>
+
+        <div class="pick" style="margin-top: 40px">
+          <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.025em; max-width: 16ch; line-height: 1.15">
+            On ne joue pas avec votre sécurité.
+          </div>
+          <div class="url">novarel-site.onrender.com</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
