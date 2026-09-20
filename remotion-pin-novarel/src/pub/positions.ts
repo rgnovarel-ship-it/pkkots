@@ -4,11 +4,11 @@
  */
 export const Y = {
   eyebrow: 92,
-  band: 150,
-  headline: 372, // ligne 1 ; les suivantes sont calées dessus
-  description: 648,
-  panel: 762,
-  cta: 1146,
-  signature: 1292,
-  logo: 1402,
+  compare: 150,
+  headline: 396, // ligne 1 ; les suivantes sont calées dessus
+  description: 690,
+  panel: 792,
+  cta: 1168,
+  signature: 1300,
+  logo: 1406,
 } as const;

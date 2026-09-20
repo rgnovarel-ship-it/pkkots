@@ -6,7 +6,7 @@ Deux compositions :
 
 | id | ce que c'est | sortie |
 |---|---|---|
-| **`PubNovarel`** | version courante — bandeau des mois + titre au masque, monde clair du site | `out/pub-novarel.mp4` (7,5 s) |
+| **`PubNovarel`** | version courante — comparateur 12 cases contre 1, titre au masque | `out/pub-novarel.mp4` (7,5 s) |
 | `PinNovarel` | première version, gardée en archive — scène de nuit | `out/pin-novarel.mp4` (6,5 s) |
 
 Format commun : 1000 × 1500 (2:3 Pinterest), 30 fps, MP4 / H.264 / yuv420p,
@@ -46,17 +46,26 @@ REMOTION_BROWSER_EXECUTABLE=/chemin/vers/headless_shell npm run build:pub
 | Position verticale des blocs | `src/pub/positions.ts` |
 | Couleurs et easing de marque (partagés) | `src/brand.ts` |
 | Fond papier, chaleur, balayage brillant | `src/pub/parts/Paper.tsx` |
-| Le bandeau des mois (hauteur, vitesse, largeur des cellules) | `src/pub/parts/Ticker.tsx` |
+| Le comparateur (taille des cases, vitesse de remplissage) | `src/pub/parts/Compare.tsx` |
 | Le titre, sa révélation au masque, le bloc signal | `src/pub/parts/Copy.tsx` |
 | Le panneau comparatif | `src/pub/parts/Panel.tsx` |
 | Intensité du grain | `src/pub/parts/Grain.tsx` |
 
 ## Le parti pris visuel
 
-Aucun objet dessiné. Le visuel principal est un **bandeau d'encre où les douze
-mois défilent sans jamais s'arrêter** — c'est ça, « tous les mois » — et le
-titre répond juste en dessous. Un faux objet en volume est le marqueur numéro un
-d'un visuel généré : il n'y en a plus.
+Aucun objet dessiné — un faux objet en volume est le marqueur numéro un d'un
+visuel généré.
+
+Le visuel principal est un **comparateur** : deux rangées strictement
+identiques, douze emplacements chacune. En haut, l'abonnement mensuel les
+remplit tous, un par un, puis l'année recommence. En bas, NOVAREL n'en remplit
+qu'un, et les onze autres restent vides. `×12 / AN` contre `×1`. On voit la
+différence avant de lire quoi que ce soit.
+
+Les leviers sont assumés mais honnêtes : on met les deux modèles côte à côte
+(effet de contraste) et on montre l'année entière d'un coup au lieu du « petit
+prix mensuel » (agrégation temporelle). Ce qu'on ne fait pas : compte à rebours,
+rareté fabriquée, faux avis, montant inventé, peur du cambriolage.
 
 La lumière est une lumière d'imprimé, pas une lumière de scène 3D :
 
@@ -76,21 +85,19 @@ son masque.
 
 ## La boucle
 
-Le bandeau, le sur-titre et le logo sont présents du début à la fin, et **toute
+Le comparateur, le sur-titre et le logo sont présents du début à la fin, et **toute
 leur animation est périodique sur la durée totale**. Le défilement des mois est
-exact : chaque cellule fait une largeur fixe (`CELL` dans `Ticker.tsx`), le
-motif se répète donc tous les 12 × CELL pixels, et on translate d'un cycle
-entier sur `DURATION` — le raccord est mathématiquement invisible. Le balayage
-brillant et le micro-travelling suivent la même règle (`loopWave()` dans
-`motion.ts`).
+calé : un cycle de remplissage fait 75 frames, soit exactement 3 années sur les
+225 frames de la vidéo (`CYCLE` dans `Compare.tsx`). Le balayage brillant et le
+micro-travelling suivent la même règle (`loopWave()` dans `motion.ts`).
 
 Seuls les textes entrent puis ressortent, en cascade inverse. Conséquence : la
-dernière frame est identique à la première — bandeau, sur-titre et logo — donc
+dernière frame est identique à la première — comparateur, sur-titre et logo — donc
 la boucle ne coupe pas, et aucune frame n'est noire ni vide.
 
 **Couverture Pinterest :** la première frame ne porte pas encore le message.
 Choisis l'image de couverture au moment de l'upload, ou utilise
-`out/pub-novarel-cover.png` (frame 150, la composition complète).
+`out/pub-novarel-cover.png` (frame 135 : les douze cases pleines, la composition complète).
 
 ## Polices
 
@@ -115,6 +122,7 @@ droite), le `.badge`, le `.btn--signal`, le `.brand`.
 - Aucun chiffre, aucune note, aucun avis, aucun classement inventé. Les prix
   sont les fourchettes fournies, recopiées telles quelles dans `content.ts`.
 - Aucune image ni vidéo téléchargée : tout est typographie, aplats et filets.
-- Les douze mois sont les douze mois de l'année, rien d'autre à y lire : ni
-  montant, ni durée d'engagement, ni promesse.
+- Aucun montant inventé. `×12 / AN` est l'arithmétique d'un abonnement mensuel
+  (douze mois dans une année) et `×1` la définition d'un achat unique — pas des
+  chiffres de produit.
 - Tout le mouvement dérive de `useCurrentFrame()`, avec l'easing du site.

@@ -5,21 +5,31 @@
 
 export const EYEBROW = "COMPARATIF CAMÉRAS · 2026";
 
-/** Les douze mois : c'est le bandeau qui défile, rien d'autre à y lire. */
+/** Les douze mois de l'année, abrégés : les douze cases du comparateur. */
 export const MONTHS = [
-  "JANVIER",
-  "FÉVRIER",
-  "MARS",
-  "AVRIL",
+  "JAN",
+  "FÉV",
+  "MAR",
+  "AVR",
   "MAI",
   "JUIN",
-  "JUILLET",
+  "JUIL",
   "AOÛT",
-  "SEPTEMBRE",
-  "OCTOBRE",
-  "NOVEMBRE",
-  "DÉCEMBRE",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DÉC",
 ] as const;
+
+/**
+ * Le bloc de comparaison. Rien ici n'est un chiffre de produit : « ×12 / an »
+ * est l'arithmétique d'un abonnement mensuel (douze mois dans une année), et
+ * « ×1 » est la définition d'un achat unique.
+ */
+export const COMPARE = {
+  subscription: { label: "AVEC UN ABONNEMENT MENSUEL", tally: "×12 / AN" },
+  oneShot: { label: "AVEC NOVAREL", tally: "×1" },
+} as const;
 
 /** Titre en trois temps : le constat, le mot surligné, la chute. */
 export const HEADLINE = {

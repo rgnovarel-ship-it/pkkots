@@ -27,7 +27,7 @@
     "lint": "eslint src && tsc",
     "build:pin": "remotion render PinNovarel out/pin-novarel.mp4",
     "build:pub": "remotion render PubNovarel out/pub-novarel.mp4",
-    "cover": "remotion still PubNovarel out/pub-novarel-cover.png --frame=150"
+    "cover": "remotion still PubNovarel out/pub-novarel-cover.png --frame=135"
   },
   "sideEffects": [
     "*.css"
